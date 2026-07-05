@@ -35,12 +35,13 @@ export function Onboarding() {
     setPicked((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]))
   }
 
+  // block flow (NOT flex) so tall steps overflow and scroll on small phones —
+  // a flex column would compress the interest grid and clip the last lenses
   const frame: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
     overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
+    WebkitOverflowScrolling: 'touch',
     padding: 'max(28px, env(safe-area-inset-top)) 24px 40px',
     maxWidth: 560,
     margin: '0 auto',
@@ -49,7 +50,7 @@ export function Onboarding() {
   if (step === 'welcome') {
     return (
       <div className="screen" style={frame} key="welcome">
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="mono reveal d1" style={{ marginBottom: 18 }}>
             परिक्रमा · the sacred circle
           </div>
@@ -63,7 +64,7 @@ export function Onboarding() {
           </p>
           <div className="reveal d4" style={{ marginBottom: 34 }}>
             <StatusLine
-              steps={['loading the curated atlas', 'indexing 190 worthwhile places', 'calibrating your lenses']}
+              steps={['loading the curated atlas', 'linking the open map of India', 'calibrating your lenses']}
               doneLabel="ready when you are"
             />
           </div>
@@ -174,7 +175,8 @@ export function Onboarding() {
         Where shall we draw the circles?
       </h2>
       <p className="reveal d2" style={{ color: 'var(--text-secondary)', fontSize: 14.5, margin: '0 0 26px' }}>
-        Your location never leaves this device — the atlas is onboard.
+        GPS, or just type any place in India — Kalpetta works as well as Jaipur. Your location is only
+        used to look around the open map; it is never stored anywhere but this device.
       </p>
 
       <div className="reveal d3" style={{ marginBottom: 14 }}>
@@ -186,11 +188,11 @@ export function Onboarding() {
           }
           doneLabel={
             located
-              ? `centered ${location.near ? `near ${location.near.hub.name}` : 'on your fix'}`
+              ? `centered ${location.placeName ? `on ${location.placeName}` : location.near ? `near ${location.near.hub.name}` : 'on your fix'}`
               : location.status === 'denied'
-                ? 'permission declined — choose a city below'
+                ? 'permission declined — search your place below'
                 : location.status === 'unavailable'
-                  ? 'no fix — choose a city below'
+                  ? 'no fix — search your place below'
                   : 'awaiting your signal'
           }
         />
@@ -203,11 +205,11 @@ export function Onboarding() {
           </Pill>
         )}
         <Pill full variant={located ? 'accent' : 'ghost'} onClick={() => (located ? completeOnboarding() : openLocation(true))}>
-          {located ? 'Draw my circles →' : 'Choose a city instead'}
+          {located ? 'Draw my circles →' : 'Find my place instead'}
         </Pill>
         {located && (
           <button className="quiet-btn" onClick={() => openLocation(true)} style={{ alignSelf: 'center' }}>
-            not here? choose a city
+            not here? search any place
           </button>
         )}
       </div>

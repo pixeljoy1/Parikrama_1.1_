@@ -1,19 +1,25 @@
 /**
  * LocationSheet — where the traveler tells us where they are: re-detect via
- * GPS, or pick any tourism hub by hand (no permission, no GPS, or planning
- * a trip from the couch — the app works either way).
+ * GPS, pick a curated hub, or search ANY place in India by name (Kalpetta,
+ * Ziro, Chettinad…) via OpenStreetMap geocoding. No permission, no GPS, or
+ * planning from the couch — the app works either way.
  */
 
 import { useMemo, useState } from 'react'
 import { HUBS } from '../data/hubs'
+import { GeoPlace, searchIndia } from '../geo/geocode'
 import { useStore } from '../state/store'
 import { haptic } from '../state/util'
 import { Pill } from './Pill'
 import { Sheet } from './Sheet'
 
+type SearchState = 'idle' | 'searching' | 'done' | 'error'
+
 export function LocationSheet() {
   const { locationOpen, openLocation, location } = useStore()
   const [query, setQuery] = useState('')
+  const [results, setResults] = useState<GeoPlace[]>([])
+  const [search, setSearch] = useState<SearchState>('idle')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -21,13 +27,36 @@ export function LocationSheet() {
     return HUBS.filter((h) => `${h.name} ${h.state}`.toLowerCase().includes(q))
   }, [query])
 
+  const runSearch = async () => {
+    const q = query.trim()
+    if (q.length < 2 || search === 'searching') return
+    haptic.light()
+    setSearch('searching')
+    setResults([])
+    try {
+      setResults(await searchIndia(q))
+      setSearch('done')
+    } catch {
+      setSearch('error')
+    }
+  }
+
+  const pickPlace = (r: GeoPlace) => {
+    haptic.medium()
+    location.choosePlace(r.name, { lat: r.lat, lng: r.lng })
+    setQuery('')
+    setResults([])
+    setSearch('idle')
+    openLocation(false)
+  }
+
   const statusLine =
     location.status === 'locating'
       ? 'listening for satellites…'
       : location.status === 'denied'
-        ? 'location permission declined — pick a city instead'
+        ? 'location permission declined — allow it in your browser/app settings, or search below'
         : location.status === 'unavailable'
-          ? 'no GPS fix — pick a city instead'
+          ? 'no GPS fix (indoors?) — try again near a window, or search below'
           : location.status === 'live'
             ? 'live fix acquired'
             : 'choose how to place yourself'
@@ -50,28 +79,94 @@ export function LocationSheet() {
       </Pill>
 
       <div className="sect" style={{ marginBottom: 12 }}>
-        <span className="label">or drop into a city</span>
+        <span className="label">or type any place in India</span>
       </div>
 
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search 29 hubs — Jaipur, Kochi, Leh…"
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          borderRadius: 14,
-          border: '1px solid var(--hairline)',
-          background: 'var(--chip)',
-          fontSize: 15,
-          outline: 'none',
-          marginBottom: 14,
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          runSearch()
         }}
-      />
+        style={{ display: 'flex', gap: 8, marginBottom: 14 }}
+      >
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setSearch('idle')
+          }}
+          placeholder="Kalpetta, Ziro, Orchha, Gokarna…"
+          enterKeyHint="search"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '12px 16px',
+            borderRadius: 14,
+            border: '1px solid var(--hairline)',
+            background: 'var(--chip)',
+            fontSize: 15,
+            outline: 'none',
+          }}
+        />
+        <button
+          type="submit"
+          className="quiet-btn"
+          style={{ flexShrink: 0, color: query.trim().length >= 2 ? 'var(--accent)' : undefined }}
+        >
+          {search === 'searching' ? '…' : 'search'}
+        </button>
+      </form>
+
+      {/* geocoded finds — anywhere in India */}
+      {search === 'error' && (
+        <p className="mono-lg" style={{ color: 'var(--danger)', margin: '0 0 14px' }}>
+          search failed — check your connection and try again
+        </p>
+      )}
+      {search === 'done' && results.length === 0 && (
+        <p className="mono-lg" style={{ margin: '0 0 14px' }}>
+          nothing found in India for “{query.trim()}” — try the town or district name
+        </p>
+      )}
+      {results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          {results.map((r, i) => (
+            <button
+              key={`${r.lat},${r.lng},${i}`}
+              onClick={() => pickPlace(r)}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: 12,
+                textAlign: 'left',
+                padding: '12px 14px',
+                borderRadius: 14,
+                border: '1px solid var(--accent-line)',
+                background: 'var(--accent-soft)',
+              }}
+            >
+              <span>
+                <span style={{ fontSize: 16, fontWeight: 400 }}>{r.name}</span>
+                <span className="mono" style={{ display: 'block', marginTop: 3, textTransform: 'none' }}>
+                  {r.display}
+                </span>
+              </span>
+              <span className="mono" style={{ flexShrink: 0, color: 'var(--accent)' }}>
+                center here →
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="sect" style={{ marginBottom: 12 }}>
+        <span className="label">curated hubs</span>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.map((h) => {
-          const current = location.status === 'manual' && location.near?.hub.id === h.id
+          const current = location.status === 'manual' && location.placeName === h.name
           return (
             <button
               key={h.id}
@@ -103,8 +198,8 @@ export function LocationSheet() {
           )
         })}
         {filtered.length === 0 && (
-          <p className="mono-lg" style={{ textAlign: 'center', padding: 20 }}>
-            nothing matches — try a state name
+          <p className="mono-lg" style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+            no hub matches — use search above to find “{query.trim()}” anywhere in India
           </p>
         )}
       </div>

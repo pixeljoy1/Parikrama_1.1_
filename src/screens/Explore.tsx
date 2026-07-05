@@ -4,19 +4,23 @@
  * the circle you chose, then the horizon beyond it.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PlaceCard } from '../components/PlaceCard'
 import { PlaceSheet } from '../components/PlaceSheet'
 import { Radar } from '../components/Radar'
 import { Reveal } from '../components/Reveal'
 import { RingDial } from '../components/RingDial'
+import { discoverAround } from '../data/discover'
 import { HUBS, horizonHubs } from '../data/hubs'
-import { Ring } from '../data/types'
-import { PACE_COUNT, ringCounts, scoreAround } from '../explorer/score'
+import { POIS } from '../data/pois'
+import { Poi, Ring } from '../data/types'
+import { PACE_COUNT, dedupeDiscoveries, ringCounts, scoreAround, scorePois } from '../explorer/score'
 import { bearingDeg, compass, fmtCoords, fmtKm } from '../geo/geo'
 import { useStore } from '../state/store'
 import { greeting, haptic, nextInvitation, prefersReducedMotion } from '../state/util'
 import { Pill } from '../components/Pill'
+
+type ScanState = 'idle' | 'scanning' | 'done' | 'error'
 
 export function Explore() {
   const { persisted, location, openSettings, openPlan, openLocation, placeId, openPlace } = useStore()
@@ -27,27 +31,64 @@ export function Explore() {
   const origin = location.point
   const profile = { interests: persisted.interests, pace: persisted.pace }
 
+  // live discovery: scan OpenStreetMap around the center so the app works
+  // anywhere in India — Kalpetta's waterfalls, not just the curated hubs
+  const [discovered, setDiscovered] = useState<Poi[]>([])
+  const [scan, setScan] = useState<ScanState>('idle')
+  useEffect(() => {
+    if (!origin) return
+    let cancelled = false
+    setScan('scanning')
+    setDiscovered([])
+    discoverAround(origin, 30)
+      .then((pois) => {
+        if (cancelled) return
+        setDiscovered(dedupeDiscoveries(pois, POIS))
+        setScan('done')
+      })
+      .catch(() => !cancelled && setScan('error'))
+    return () => {
+      cancelled = true
+    }
+  }, [origin?.lat, origin?.lng])
+
   // score the whole atlas once per location/profile; slices derive from it
   const scoredAll = useMemo(
     () => (origin ? scoreAround(origin, profile, 1e9) : []),
     [origin?.lat, origin?.lng, persisted.interests.join(','), persisted.pace],
   )
-  const within30 = useMemo(() => scoredAll.filter((s) => s.km <= 30), [scoredAll])
+  const within30 = useMemo(() => {
+    if (!origin) return []
+    const curated = scoredAll.filter((s) => s.km <= 30)
+    const found = scorePois(discovered, origin, profile, 30)
+    return [...curated, ...found].sort((a, b) => b.match - a.match)
+  }, [scoredAll, discovered, origin?.lat, origin?.lng, persisted.interests.join(','), persisted.pace])
   const counts = useMemo(() => ringCounts(within30), [within30])
   const list = useMemo(
     () => within30.filter((s) => s.km <= ring).slice(0, PACE_COUNT[persisted.pace] * 2),
     [within30, ring, persisted.pace],
   )
   const horizon = useMemo(() => (origin ? horizonHubs(origin, 30, 4) : []), [origin?.lat, origin?.lng])
-  const selected = useMemo(() => scoredAll.find((s) => s.poi.id === placeId) ?? null, [scoredAll, placeId])
+  const selected = useMemo(() => {
+    if (!placeId || !origin) return null
+    const hit = within30.find((s) => s.poi.id === placeId) ?? scoredAll.find((s) => s.poi.id === placeId)
+    if (hit) return hit
+    // a saved OSM discovery from a previous location — score its snapshot
+    const snap = persisted.savedOsm[placeId]
+    return snap ? (scorePois([snap], origin, profile, 1e9)[0] ?? null) : null
+  }, [within30, scoredAll, placeId, origin?.lat, origin?.lng, persisted.savedOsm])
+
+  const osmCount = useMemo(() => within30.filter((s) => s.poi.osm).length, [within30])
 
   const locLabel = !origin
     ? 'no location yet'
-    : location.near && location.near.km > 2
-      ? `${fmtKm(location.near.km)} from ${location.near.hub.name}`
-      : location.near
-        ? location.near.hub.name
-        : 'your fix'
+    : location.placeName
+      ? location.placeName
+      : location.near && location.near.km > 2
+        ? `${fmtKm(location.near.km)} from ${location.near.hub.name}`
+        : location.near
+          ? location.near.hub.name
+          : 'your fix'
 
   return (
     <div className="screen" style={{ overflowY: 'auto' }}>
@@ -135,9 +176,20 @@ export function Explore() {
                 reduceMotion={reduce}
               />
               <p className="mono" style={{ textAlign: 'center', margin: '4px 0 10px' }}>
-                {within30.length > 0
-                  ? `${within30.length} worthwhile place${within30.length === 1 ? '' : 's'} inside 30 km`
-                  : 'the atlas is quiet here — see the horizon below'}
+                {scan === 'scanning' && (
+                  <span>
+                    <span className="status-dot" style={{ marginRight: 8 }} />
+                    scanning the open map around you…
+                  </span>
+                )}
+                {scan !== 'scanning' &&
+                  (within30.length > 0
+                    ? `${within30.length} worthwhile place${within30.length === 1 ? '' : 's'} inside 30 km${
+                        osmCount > 0 ? ` · ${osmCount} discovered live` : ''
+                      }`
+                    : scan === 'error'
+                      ? 'the atlas is quiet here and the map scan failed — check your connection'
+                      : 'quiet circles — see the horizon below')}
               </p>
             </Reveal>
 
@@ -224,7 +276,7 @@ export function Explore() {
         </div>
 
         <footer className="mono" style={{ textAlign: 'center' }}>
-          curated atlas · 190 places · your location stays on-device
+          curated atlas · 190 places · live discovery via OpenStreetMap · location stays on-device
         </footer>
       </div>
 

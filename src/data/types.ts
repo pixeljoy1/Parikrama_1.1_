@@ -28,10 +28,12 @@ export type Ring = (typeof RINGS)[number]
 export type Fee = 'free' | '₹' | '₹₹'
 export type BestTime = 'sunrise' | 'morning' | 'afternoon' | 'sunset' | 'evening' | 'any'
 
-/** A curated worthwhile place. */
+/** A worthwhile place — curated, or discovered live from OpenStreetMap. */
 export interface Poi extends LatLng {
   id: string
-  hub: string // hub id this place clusters under
+  hub: string // hub id this place clusters under ('_osm' for discoveries)
+  /** true when this came from live OpenStreetMap discovery, not the atlas */
+  osm?: boolean
   name: string
   /** interest affinities, 0–1 — how strongly the place delivers each lens */
   cats: Partial<Record<Interest, number>>

@@ -16,7 +16,8 @@ export function PlanSheet() {
 
   const items = useMemo(() => {
     const list = persisted.saved
-      .map(poiById)
+      // curated atlas first, then the persisted snapshot for OSM discoveries
+      .map((id) => poiById(id) ?? persisted.savedOsm[id])
       .filter((p): p is NonNullable<typeof p> => !!p)
       .map((p) => ({
         p,
@@ -24,7 +25,7 @@ export function PlanSheet() {
         dir: origin ? compass(bearingDeg(origin, p)) : null,
       }))
     return list.sort((a, b) => (a.km ?? 0) - (b.km ?? 0))
-  }, [persisted.saved, origin])
+  }, [persisted.saved, persisted.savedOsm, origin])
 
   return (
     <Sheet open={planOpen} onClose={() => openPlan(false)} title="My plan">

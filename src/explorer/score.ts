@@ -53,8 +53,13 @@ export function ringFor(km: number): Ring | null {
 
 /** Score every POI within `maxKm` of `origin` for this profile. */
 export function scoreAround(origin: LatLng, profile: TravelerProfile, maxKm = 30): ScoredPoi[] {
+  return scorePois(POIS, origin, profile, maxKm)
+}
+
+/** Score any set of places (curated atlas, live OSM discoveries, or both). */
+export function scorePois(pois: Poi[], origin: LatLng, profile: TravelerProfile, maxKm = 30): ScoredPoi[] {
   const out: ScoredPoi[] = []
-  for (const poi of POIS) {
+  for (const poi of pois) {
     const km = distanceKm(origin, poi)
     if (km > maxKm) continue
     const { a, top } = affinity(poi, profile.interests)
@@ -64,6 +69,11 @@ export function scoreAround(origin: LatLng, profile: TravelerProfile, maxKm = 30
     out.push({ poi, km, bearing, dir: compass(bearing), ring: ringFor(km), match, topInterest: top })
   }
   return out.sort((x, y) => y.match - x.match)
+}
+
+/** Drop discoveries that duplicate a curated place (same spot on the map). */
+export function dedupeDiscoveries(discovered: Poi[], curated: Poi[]): Poi[] {
+  return discovered.filter((d) => !curated.some((c) => distanceKm(d, c) < 0.3))
 }
 
 /** The ranked shortlist inside the active ring, sized to the traveler's pace. */

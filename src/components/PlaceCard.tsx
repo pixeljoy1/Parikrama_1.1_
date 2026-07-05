@@ -53,8 +53,13 @@ export function PlaceCard({ s, saved, onOpen }: Props) {
           </span>
         )}
         <span className="mono">{fmtMinutes(s.poi.minutes)}</span>
-        <span className="mono">{s.poi.fee === 'free' ? 'free' : s.poi.fee}</span>
+        {!s.poi.osm && <span className="mono">{s.poi.fee === 'free' ? 'free' : s.poi.fee}</span>}
         {s.poi.best !== 'any' && <span className="mono">best · {s.poi.best}</span>}
+        {s.poi.osm && (
+          <span className="mono" style={{ color: 'var(--accent-2)' }}>
+            ◈ discovered
+          </span>
+        )}
       </div>
       {/* match bar — quiet, hairline-thin */}
       <div style={{ height: 2, background: 'var(--chip)', borderRadius: 1, marginTop: 12 }}>

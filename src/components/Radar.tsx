@@ -122,13 +122,14 @@ export function Radar({ scored, activeRing, selectedId, onPick, reduceMotion }: 
             {selected && (
               <circle cx={x} cy={y} r={r + 6} fill="none" stroke="var(--accent)" strokeWidth={1} opacity={0.5} />
             )}
+            {/* curated = solid teal; live OSM discovery = hollow ring */}
             <circle
               className="radar-dot"
               cx={x}
               cy={y}
               r={r}
-              fill={selected ? 'var(--accent)' : 'var(--accent-2)'}
-              stroke="var(--surface-raised)"
+              fill={selected ? 'var(--accent)' : s.poi.osm ? 'var(--surface-raised)' : 'var(--accent-2)'}
+              stroke={selected ? 'var(--surface-raised)' : s.poi.osm ? 'var(--accent-2)' : 'var(--surface-raised)'}
               strokeWidth={1.2}
               onClick={() => {
                 haptic.light()

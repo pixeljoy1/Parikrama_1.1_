@@ -5,7 +5,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { Interest, Pace } from '../data/types'
+import { Interest, Pace, Poi } from '../data/types'
 import { UseLocation, useLocation } from '../geo/useLocation'
 import { DEFAULT_PERSISTED, Persisted, Screen, ThemeId } from './types'
 
@@ -42,7 +42,8 @@ interface StoreShape {
   setTheme: (v: ThemeId) => void
   completeOnboarding: () => void
   resetProfile: () => void
-  toggleSaved: (id: string) => void
+  /** pass the poi when saving an OSM discovery so the plan keeps a snapshot */
+  toggleSaved: (id: string, poi?: Poi) => void
   toggleSeen: (id: string) => void
 }
 
@@ -96,7 +97,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         patch({ onboardingComplete: false })
         setScreen('onboarding')
       },
-      toggleSaved: (id) => setPersisted((s) => ({ ...s, saved: toggleIn(s.saved, id) })),
+      toggleSaved: (id, poi) =>
+        setPersisted((s) => {
+          const saved = toggleIn(s.saved, id)
+          const savedOsm = { ...s.savedOsm }
+          if (poi?.osm && saved.includes(id)) savedOsm[id] = poi
+          else if (!saved.includes(id)) delete savedOsm[id]
+          return { ...s, saved, savedOsm }
+        }),
       toggleSeen: (id) => setPersisted((s) => ({ ...s, seen: toggleIn(s.seen, id) })),
     }),
     [persisted, location, screen, settingsOpen, planOpen, locationOpen, placeId, patch],

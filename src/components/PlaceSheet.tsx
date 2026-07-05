@@ -38,23 +38,31 @@ export function PlaceSheet({ scored, onClose }: Props) {
             {s.poi.blurb}
           </p>
 
-          {/* insider tip — the marigold margin note */}
-          <div
-            style={{
-              borderLeft: '2px solid var(--accent)',
-              background: 'var(--accent-soft)',
-              borderRadius: '0 12px 12px 0',
-              padding: '12px 16px',
-              marginBottom: 18,
-            }}
-          >
-            <div className="mono" style={{ color: 'var(--accent)', marginBottom: 4 }}>
-              like a local
+          {/* insider tip — the marigold margin note (curated places only) */}
+          {s.poi.tip && (
+            <div
+              style={{
+                borderLeft: '2px solid var(--accent)',
+                background: 'var(--accent-soft)',
+                borderRadius: '0 12px 12px 0',
+                padding: '12px 16px',
+                marginBottom: 18,
+              }}
+            >
+              <div className="mono" style={{ color: 'var(--accent)', marginBottom: 4 }}>
+                like a local
+              </div>
+              <p className="serif-i" style={{ margin: 0, fontSize: 15.5, lineHeight: 1.5 }}>
+                {s.poi.tip}
+              </p>
             </div>
-            <p className="serif-i" style={{ margin: 0, fontSize: 15.5, lineHeight: 1.5 }}>
-              {s.poi.tip}
+          )}
+          {s.poi.osm && (
+            <p className="mono-lg" style={{ margin: '0 0 18px', color: 'var(--accent-2)' }}>
+              ◈ live discovery from OpenStreetMap — timings and entry aren’t verified; the Maps
+              link below has current details
             </p>
-          </div>
+          )}
 
           {/* practicals strip */}
           <div
@@ -93,7 +101,7 @@ export function PlaceSheet({ scored, onClose }: Props) {
               variant={saved ? 'ghost' : 'accent'}
               onClick={() => {
                 haptic.doublePulse()
-                toggleSaved(s.poi.id)
+                toggleSaved(s.poi.id, s.poi)
               }}
             >
               {saved ? 'Remove from plan' : 'Add to my plan'}
