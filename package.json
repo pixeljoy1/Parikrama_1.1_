@@ -1,0 +1,30 @@
+{
+  "name": "parikrama-explorer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Parikrama — India, in circles around you. A location-aware tourism explorer: what's absolutely worth it within 5/10/20/30 km, matched to how you travel. Web prototype (Android-ready).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4190",
+    "icon": "node scripts/gen-icon.mjs",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.35.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

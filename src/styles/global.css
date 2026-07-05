@@ -1,0 +1,445 @@
+/* Global styles — Parikrama. Ivory by day, midnight by choice. */
+
+:root {
+  --surface: #f6f1e7;
+  --surface-raised: #fdfaf3;
+  --text-primary: #221e19;
+  --text-secondary: #75705f;
+  --text-ghost: #c3bca9;
+  --accent: #c2571b;
+  --accent-2: #0f6b66;
+  --danger: #c23b2e;
+
+  --serif: 'DM Serif Display', Georgia, serif;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  /* frosted panel + hairline + chip fill (theme-aware) */
+  --panel: rgba(253, 250, 243, 0.82);
+  --hairline: rgba(34, 30, 25, 0.14);
+  --chip: rgba(34, 30, 25, 0.05);
+
+  --accent-soft: rgba(194, 87, 27, 0.1);
+  --accent-line: rgba(194, 87, 27, 0.4);
+  --accent-glow: rgba(194, 87, 27, 0.22);
+  --accent2-soft: rgba(15, 107, 102, 0.1);
+  --on-accent: #fdf6ec;
+
+  --shadow-card: 0 14px 38px -22px rgba(60, 42, 20, 0.5), 0 3px 12px -6px rgba(60, 42, 20, 0.18);
+  --shadow-card-hover: 0 30px 64px -24px rgba(60, 42, 20, 0.45), 0 0 0 1px var(--accent-line),
+    0 10px 36px -10px var(--accent-glow);
+}
+
+/* Midnight — ink and ember */
+:root[data-theme='midnight'] {
+  --surface: #12100d;
+  --surface-raised: #1c1915;
+  --text-primary: #f1ebdd;
+  --text-secondary: #9c9484;
+  --text-ghost: #4a453b;
+  --accent: #e8813f;
+  --accent-2: #3fb3ac;
+  --danger: #e06052;
+  --panel: rgba(28, 25, 21, 0.8);
+  --hairline: rgba(241, 235, 221, 0.13);
+  --chip: rgba(241, 235, 221, 0.06);
+  --accent-soft: rgba(232, 129, 63, 0.13);
+  --accent-line: rgba(232, 129, 63, 0.42);
+  --accent-glow: rgba(232, 129, 63, 0.26);
+  --accent2-soft: rgba(63, 179, 172, 0.12);
+  --on-accent: #1a120a;
+  --shadow-card: 0 14px 38px -22px rgba(0, 0, 0, 0.7), 0 3px 12px -6px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 30px 64px -24px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--accent-line),
+    0 10px 36px -10px var(--accent-glow);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: auto;
+  user-select: none;
+}
+
+button {
+  font-family: var(--sans);
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+input {
+  font-family: var(--sans);
+  color: var(--text-primary);
+}
+
+/* Scrollbars stay invisible — the content is the face. */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.app-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.serif {
+  font-family: var(--serif);
+  font-weight: 400;
+}
+.serif-i {
+  font-family: var(--serif);
+  font-style: italic;
+}
+
+/* ── Texture & quiet-systems layer (the interaction fingerprint) ──────── */
+
+/* Paper grain over everything — makes the ivory feel printed, not rendered. */
+.app-frame::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 9s steps(6) infinite;
+}
+:root[data-theme='midnight'] .app-frame::after {
+  opacity: 0.06;
+}
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6%, 4%); }
+  40% { transform: translate(4%, -7%); }
+  60% { transform: translate(-3%, -3%); }
+  80% { transform: translate(6%, 5%); }
+}
+
+/* Entrance choreography — content rises softly into place. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.d1 { animation-delay: 60ms; }
+.d2 { animation-delay: 140ms; }
+.d3 { animation-delay: 220ms; }
+.d4 { animation-delay: 300ms; }
+.d5 { animation-delay: 380ms; }
+.d6 { animation-delay: 460ms; }
+
+/* Scroll-driven reveals — sections rise as they enter the viewport. */
+.io {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 900ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.io.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Monospace micro-copy: kickers, coordinates, status lines. */
+.mono {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.mono-lg {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+
+/* Live status dot — quietly working. */
+@keyframes statusBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: statusBlink 2.2s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+/* Breathing halo — concentric rings that expand and dissolve. */
+@keyframes ringPulse {
+  0% { transform: scale(0.6); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.pulse-dot {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  animation: ringPulse 2.8s ease-out infinite;
+}
+
+/* Section header: label + a hairline that stretches to meet the edge. */
+.sect {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sect::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--hairline), transparent);
+}
+
+/* Gradient ink for display type — marigold bleeding through the serif. */
+.ink {
+  background: linear-gradient(115deg, var(--text-primary) 42%, var(--accent) 78%, var(--accent-2) 108%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Marquee — a slow ribbon of place names. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  padding: 12px 0;
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+.marquee > div {
+  display: inline-block;
+  animation: marquee 26s linear infinite;
+}
+.marquee span {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0 18px;
+}
+.marquee em {
+  font-family: var(--serif);
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0.5px;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+/* Place cards: buttery resting shadow, lift, glow, and settle. */
+.place-card {
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 420ms cubic-bezier(0.34, 1.2, 0.4, 1),
+    box-shadow 420ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+@media (hover: hover) {
+  .place-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+.place-card:active {
+  transform: scale(0.978);
+}
+
+/* The interest matrix — a hairline grid of lenses (onboarding). */
+.matrix {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  overflow: hidden;
+}
+@media (min-width: 560px) {
+  .matrix {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.matrix-cell {
+  position: relative;
+  background: var(--surface);
+  padding: 16px 16px 14px;
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+  transition: background 400ms ease;
+  overflow: hidden;
+}
+@media (hover: hover) {
+  .matrix-cell:hover {
+    background: var(--surface-raised);
+  }
+}
+.matrix-cell:active {
+  transform: scale(0.985);
+}
+.matrix-cell.on {
+  background: var(--accent-soft);
+}
+.matrix-cell.on::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--accent-line);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Radar rings breathe — one slow pass of the sweep line. */
+@keyframes radarSweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.radar-sweep {
+  transform-origin: center;
+  animation: radarSweep 14s linear infinite;
+}
+@keyframes poiBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.radar-dot {
+  cursor: pointer;
+  transition: r 200ms ease;
+}
+
+/* Chips row — horizontally scrollable, no scrollbar. */
+.chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Soft panel shadow for hero cards. */
+.soft-panel {
+  box-shadow:
+    0 34px 80px -40px rgba(60, 42, 20, 0.4),
+    0 6px 22px -12px rgba(60, 42, 20, 0.2);
+}
+:root[data-theme='midnight'] .soft-panel {
+  box-shadow:
+    0 34px 80px -40px rgba(0, 0, 0, 0.6),
+    0 6px 22px -12px rgba(0, 0, 0, 0.32);
+}
+
+/* Quiet outline text button. */
+.quiet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 9px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  transition: color 260ms ease, border-color 260ms ease, transform 260ms cubic-bezier(0.34, 1.2, 0.4, 1);
+}
+.quiet-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-line);
+}
+.quiet-btn:active {
+  transform: scale(0.96);
+}
+
+/* Keyboard focus — visible, on-brand, never a blue box. */
+:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Honor reduced motion everywhere the app animates. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .pulse-dot::after,
+  .app-frame::after,
+  .marquee > div,
+  .status-dot,
+  .radar-sweep {
+    animation: none;
+  }
+  .reveal,
+  .io {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .place-card,
+  .place-card:hover {
+    transform: none;
+    transition: none;
+  }
+}
