@@ -35,22 +35,29 @@ export function Explore() {
   // anywhere in India — Kalpetta's waterfalls, not just the curated hubs
   const [discovered, setDiscovered] = useState<Poi[]>([])
   const [scan, setScan] = useState<ScanState>('idle')
+  const [scanErr, setScanErr] = useState<string>('')
+  const [rescan, setRescan] = useState(0)
   useEffect(() => {
     if (!origin) return
     let cancelled = false
     setScan('scanning')
     setDiscovered([])
+    setScanErr('')
     discoverAround(origin, 30)
       .then((pois) => {
         if (cancelled) return
         setDiscovered(dedupeDiscoveries(pois, POIS))
         setScan('done')
       })
-      .catch(() => !cancelled && setScan('error'))
+      .catch((e) => {
+        if (cancelled) return
+        setScanErr((e as Error).message)
+        setScan('error')
+      })
     return () => {
       cancelled = true
     }
-  }, [origin?.lat, origin?.lng])
+  }, [origin?.lat, origin?.lng, rescan])
 
   // score the whole atlas once per location/profile; slices derive from it
   const scoredAll = useMemo(
@@ -204,9 +211,44 @@ export function Explore() {
                 <span className="label">absolutely worth it · within {ring} km</span>
               </div>
               {list.length === 0 ? (
-                <p className="serif-i" style={{ color: 'var(--text-secondary)', fontSize: 17 }}>
-                  Nothing curated inside this circle — widen the ring, or ride toward the horizon.
-                </p>
+                <div
+                  style={{
+                    background: 'var(--surface-raised)',
+                    border: '1px solid var(--hairline)',
+                    borderRadius: 18,
+                    padding: '20px 22px',
+                  }}
+                >
+                  <p className="serif-i" style={{ color: 'var(--text-secondary)', fontSize: 17, margin: '0 0 14px' }}>
+                    {scan === 'scanning'
+                      ? 'Still scanning the open map around you…'
+                      : scan === 'error'
+                        ? 'The live discovery scan couldn’t reach OpenStreetMap.'
+                        : ring < 30
+                          ? 'Nothing worthwhile inside this circle yet — widen the ring.'
+                          : 'The atlas is quiet at this exact spot.'}
+                  </p>
+                  {scan === 'error' && (
+                    <p className="mono-lg" style={{ color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                      {scanErr || 'both mirrors failed'} — retry, or use the horizon below.
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {scan === 'error' && (
+                      <button className="quiet-btn" onClick={() => setRescan((n) => n + 1)}>
+                        ↻ Retry live discovery
+                      </button>
+                    )}
+                    {ring < 30 && (
+                      <button className="quiet-btn" onClick={() => setRing(30)}>
+                        Widen to 30 km
+                      </button>
+                    )}
+                    <button className="quiet-btn" onClick={() => openLocation(true)}>
+                      Try another place
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {list.map((s, i) => (

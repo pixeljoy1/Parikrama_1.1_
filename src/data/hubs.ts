@@ -38,6 +38,17 @@ export const HUBS: Hub[] = [
   { id: 'ahmedabad', name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lng: 72.5714, line: 'India’s first World Heritage city' },
   { id: 'bhubaneswar', name: 'Bhubaneswar', state: 'Odisha', lat: 20.2961, lng: 85.8245, line: 'A thousand temples in laterite' },
   { id: 'pondicherry', name: 'Puducherry', state: 'Puducherry', lat: 11.9416, lng: 79.8083, line: 'A French grid by the Bay of Bengal' },
+  { id: 'wayanad', name: 'Wayanad (Kalpetta)', state: 'Kerala', lat: 11.6089, lng: 76.0832, line: 'Waterfall country in the Western Ghats' },
+  { id: 'ooty', name: 'Ooty', state: 'Tamil Nadu', lat: 11.4102, lng: 76.6950, line: 'Nilgiri hill station on a toy train' },
+  { id: 'coorg', name: 'Coorg (Madikeri)', state: 'Karnataka', lat: 12.4210, lng: 75.7397, line: 'Coffee estates in the misted hills' },
+  { id: 'thanjavur', name: 'Thanjavur', state: 'Tamil Nadu', lat: 10.7867, lng: 79.1378, line: 'The Chola bronze and granite legacy' },
+  { id: 'kanyakumari', name: 'Kanyakumari', state: 'Tamil Nadu', lat: 8.0883, lng: 77.5385, line: 'Three seas meet at India’s tip' },
+  { id: 'alleppey', name: 'Alleppey', state: 'Kerala', lat: 9.4981, lng: 76.3388, line: 'Backwater kettuvallam country' },
+  { id: 'gokarna', name: 'Gokarna', state: 'Karnataka', lat: 14.5479, lng: 74.3188, line: 'Temple town, crescent beaches' },
+  { id: 'orchha', name: 'Orchha', state: 'Madhya Pradesh', lat: 25.3510, lng: 78.6415, line: 'Bundela chhatris over the Betwa' },
+  { id: 'bikaner', name: 'Bikaner', state: 'Rajasthan', lat: 28.0229, lng: 73.3119, line: 'Junagarh fort in the sand' },
+  { id: 'gangtok', name: 'Gangtok', state: 'Sikkim', lat: 27.3389, lng: 88.6065, line: 'Prayer flags above the Teesta' },
+  { id: 'guwahati', name: 'Guwahati', state: 'Assam', lat: 26.1445, lng: 91.7362, line: 'Where the Brahmaputra bends' },
 ]
 
 export const hubById = (id: string) => HUBS.find((h) => h.id === id)

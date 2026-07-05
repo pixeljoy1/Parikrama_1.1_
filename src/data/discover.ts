@@ -113,24 +113,29 @@ export async function discoverAround(p: LatLng, radiusKm = 30): Promise<Poi[]> {
     /* cache miss */
   }
 
-  const body = 'data=' + encodeURIComponent(QUERY(p.lat, p.lng, radiusKm * 1000))
+  // Overpass' Apache is picky about POST + Content-Type; a plain-body POST with
+  // no encoding declaration reliably returns 200 across mirrors + browser fetches.
+  const query = QUERY(p.lat, p.lng, radiusKm * 1000)
   let json: { elements: OverpassElement[] } | null = null
+  let lastErr = 'unknown'
   for (const url of ENDPOINTS) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
+        body: query,
         signal: AbortSignal.timeout(30_000),
       })
-      if (!res.ok) continue
+      if (!res.ok) {
+        lastErr = `${url.split('/')[2]} → HTTP ${res.status}`
+        continue
+      }
       json = await res.json()
       break
-    } catch {
-      /* try the next mirror */
+    } catch (e) {
+      lastErr = `${url.split('/')[2]} → ${(e as Error).name || 'fetch failed'}`
     }
   }
-  if (!json) throw new Error('overpass unreachable')
+  if (!json) throw new Error(lastErr)
 
   // dedupe by name (a fort mapped as node + way should appear once)
   const seen = new Set<string>()
