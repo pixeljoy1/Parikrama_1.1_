@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function PlaceSheet({ scored, onClose }: Props) {
-  const { persisted, toggleSaved, toggleSeen } = useStore()
+  const { persisted, toggleSaved, toggleSeen, openPlan } = useStore()
   const s = scored
   const saved = !!s && persisted.saved.includes(s.poi.id)
   const seen = !!s && persisted.seen.includes(s.poi.id)
@@ -217,9 +217,29 @@ export function PlaceSheet({ scored, onClose }: Props) {
                 toggleSaved(s.poi.id, s.poi)
               }}
             >
-              {saved ? 'Remove from plan' : 'Add to my plan'}
+              {saved ? '♡ In wishlist — tap to remove' : '♡ Save to wishlist'}
             </Pill>
           </div>
+          {saved && (
+            <button
+              onClick={() => {
+                onClose()
+                openPlan(true)
+              }}
+              className="mono"
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'center',
+                padding: '10px 0',
+                marginBottom: 8,
+                color: 'var(--accent)',
+                letterSpacing: 1.4,
+              }}
+            >
+              view my wishlist →
+            </button>
+          )}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
             <a
               className="quiet-btn"

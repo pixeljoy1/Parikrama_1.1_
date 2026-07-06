@@ -90,7 +90,7 @@ export function PlaceCard({ s, saved, onOpen, photo }: Props) {
             {fmtKm(s.km)} {s.dir}
           </span>
           <span className="mono" style={{ color: saved ? 'var(--accent)' : 'var(--text-ghost)' }}>
-            {saved ? '● in plan' : `${Math.round(s.match * 100)}%`}
+            {saved ? '♡ saved' : `${Math.round(s.match * 100)}%`}
           </span>
         </div>
         <div className="serif" style={{ fontSize: 22, lineHeight: 1.15, margin: '8px 0 6px' }}>

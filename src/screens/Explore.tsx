@@ -130,8 +130,13 @@ export function Explore() {
             <span className="serif" style={{ fontSize: 21 }}>Parikrama</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="quiet-btn" onClick={() => openPlan(true)}>
-              plan{persisted.saved.length > 0 ? ` · ${persisted.saved.length}` : ''}
+            <button
+              className="quiet-btn"
+              onClick={() => openPlan(true)}
+              aria-label={`Open wishlist (${persisted.saved.length})`}
+              style={persisted.saved.length > 0 ? { color: 'var(--accent)', borderColor: 'var(--accent-line)' } : undefined}
+            >
+              ♡ {persisted.saved.length > 0 ? `Wishlist · ${persisted.saved.length}` : 'Wishlist'}
             </button>
             <button className="quiet-btn" onClick={() => openSettings(true)} aria-label="Settings">
               ⚙
