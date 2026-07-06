@@ -47,6 +47,10 @@ export interface Poi extends LatLng {
   blurb: string
   /** insider tip — the thing a good local friend would tell you */
   tip: string
+  /** OSM wikipedia tag ("en:Article Title") — a direct pointer for photos */
+  wikipedia?: string
+  /** OSM wikidata QID — the fallback pointer when wikipedia isn't tagged */
+  wikidata?: string
 }
 
 /** A tourism hub — anchors the manual picker and the "beyond the rings" horizon. */

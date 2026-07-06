@@ -1,14 +1,18 @@
 /**
- * PlaceSheet — the detail bottom sheet for one place: the story, the insider
- * tip, practicals, save-to-plan, and a Maps deep link for actual navigation.
+ * PlaceSheet — the detail bottom sheet for one place: hero photo band, up to
+ * five gallery photos, the story, the insider tip, practicals, save-to-plan,
+ * and a Maps deep link for actual navigation. Photos come from Wikimedia and
+ * carry attribution back to their Wikipedia source.
  */
 
+import { hubById } from '../data/hubs'
 import { interestById } from '../data/interests'
 import { INTERESTS } from '../data/interests'
 import { ScoredPoi } from '../explorer/score'
 import { fmtKm, mapsUrl } from '../geo/geo'
 import { useStore } from '../state/store'
 import { fmtMinutes, haptic } from '../state/util'
+import { usePhoto } from '../state/usePhotos'
 import { Pill } from './Pill'
 import { Sheet } from './Sheet'
 
@@ -23,10 +27,88 @@ export function PlaceSheet({ scored, onClose }: Props) {
   const saved = !!s && persisted.saved.includes(s.poi.id)
   const seen = !!s && persisted.seen.includes(s.poi.id)
 
+  // fetch a full gallery lazily on open — cheap thanks to the shared cache
+  const hub = s ? hubById(s.poi.hub) : null
+  const photoState = usePhoto(
+    s
+      ? {
+          id: s.poi.id,
+          name: s.poi.name,
+          context: hub ? `${hub.name} ${hub.state}` : undefined,
+          wikipedia: s.poi.wikipedia,
+          wikidata: s.poi.wikidata,
+        }
+      : null,
+  )
+  const photo = typeof photoState === 'object' ? photoState : null
+  const hasGallery = photo && photo.gallery.length > 0
+  const gallery = photo?.gallery ?? []
+  const restOfGallery = gallery.slice(1)
+
   return (
     <Sheet open={!!s} onClose={onClose}>
       {s && (
         <div>
+          {/* hero band — full-bleed above the sheet padding */}
+          {(hasGallery || photoState === 'loading') && (
+            <div
+              style={{
+                position: 'relative',
+                width: 'calc(100% + 48px)',
+                margin: '-14px -24px 20px',
+                aspectRatio: '16 / 9',
+                background: photoState === 'loading'
+                  ? 'linear-gradient(90deg, var(--chip) 0%, var(--surface-raised) 50%, var(--chip) 100%)'
+                  : 'var(--chip)',
+                backgroundSize: '200% 100%',
+                animation: photoState === 'loading' ? 'shimmer 1.6s linear infinite' : undefined,
+                overflow: 'hidden',
+              }}
+            >
+              {hasGallery && (
+                <>
+                  <img
+                    src={gallery[0]}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 'auto 0 0 0',
+                      height: 70,
+                      background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.35))',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  {photo?.source && (
+                    <a
+                      href={photo.source}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mono"
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        bottom: 8,
+                        color: 'rgba(255,255,255,0.85)',
+                        textDecoration: 'none',
+                        fontSize: 9,
+                        letterSpacing: 1.2,
+                        background: 'rgba(0,0,0,0.35)',
+                        padding: '3px 8px',
+                        borderRadius: 100,
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      photo · wikimedia
+                    </a>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <div className="mono" style={{ color: 'var(--accent-2)', marginBottom: 8 }}>
             {fmtKm(s.km)} {s.dir} of you · {Math.round(s.match * 100)}% your kind of place
           </div>
@@ -37,6 +119,37 @@ export function PlaceSheet({ scored, onClose }: Props) {
           <p style={{ fontSize: 15, lineHeight: 1.6, margin: '0 0 16px', color: 'var(--text-primary)' }}>
             {s.poi.blurb}
           </p>
+
+          {/* gallery — 2nd through 5th photos, horizontally scrollable */}
+          {restOfGallery.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                margin: '0 -24px 20px',
+                padding: '0 24px 4px',
+              }}
+            >
+              {restOfGallery.map((url, i) => (
+                <img
+                  key={`${url}-${i}`}
+                  src={url}
+                  alt=""
+                  loading="lazy"
+                  style={{
+                    width: 140,
+                    height: 90,
+                    objectFit: 'cover',
+                    borderRadius: 12,
+                    flexShrink: 0,
+                    border: '1px solid var(--hairline)',
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           {/* insider tip — the marigold margin note (curated places only) */}
           {s.poi.tip && (

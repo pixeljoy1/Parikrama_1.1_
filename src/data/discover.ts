@@ -97,6 +97,8 @@ function toPoi(el: OverpassElement): Poi | null {
     best: kind.best,
     blurb: `${kind.label} — found live on the open map of this area${tags.wikipedia || tags.wikidata ? '; notable enough to have its own wiki entry' : ''}.`,
     tip: '',
+    wikipedia: tags.wikipedia,
+    wikidata: tags.wikidata,
   }
 }
 

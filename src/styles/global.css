@@ -369,6 +369,12 @@ input {
   transition: r 200ms ease;
 }
 
+/* Skeleton shimmer for photo bands while Wikimedia resolves. */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* Chips row — horizontally scrollable, no scrollbar. */
 .chips-row {
   display: flex;

@@ -11,12 +11,14 @@ import { Radar } from '../components/Radar'
 import { Reveal } from '../components/Reveal'
 import { RingDial } from '../components/RingDial'
 import { discoverAround } from '../data/discover'
-import { HUBS, horizonHubs } from '../data/hubs'
+import { HUBS, horizonHubs, hubById } from '../data/hubs'
+import { PhotoQuery } from '../data/photos'
 import { POIS } from '../data/pois'
 import { Poi, Ring } from '../data/types'
 import { PACE_COUNT, dedupeDiscoveries, ringCounts, scoreAround, scorePois } from '../explorer/score'
 import { bearingDeg, compass, fmtCoords, fmtKm } from '../geo/geo'
 import { useStore } from '../state/store'
+import { usePhotos } from '../state/usePhotos'
 import { greeting, haptic, nextInvitation, prefersReducedMotion } from '../state/util'
 import { Pill } from '../components/Pill'
 
@@ -86,6 +88,24 @@ export function Explore() {
   }, [within30, scoredAll, placeId, origin?.lat, origin?.lng, persisted.savedOsm])
 
   const osmCount = useMemo(() => within30.filter((s) => s.poi.osm).length, [within30])
+
+  // fetch Wikimedia photos for the visible shortlist + the top few beyond it
+  // (12-place cap keeps the network cost bounded — Wikipedia loves us if we
+  // don't hammer their opensearch, and the cache keeps repeat visits free)
+  const photoQueries: PhotoQuery[] = useMemo(() => {
+    const chosen = within30.slice(0, 12)
+    return chosen.map((s) => {
+      const hub = hubById(s.poi.hub)
+      return {
+        id: s.poi.id,
+        name: s.poi.name,
+        context: hub ? `${hub.name} ${hub.state}` : undefined,
+        wikipedia: s.poi.wikipedia,
+        wikidata: s.poi.wikidata,
+      }
+    })
+  }, [within30])
+  const photos = usePhotos(photoQueries)
 
   const locLabel = !origin
     ? 'no location yet'
@@ -181,6 +201,7 @@ export function Explore() {
                 selectedId={placeId}
                 onPick={openPlace}
                 reduceMotion={reduce}
+                photos={photos}
               />
               <p className="mono" style={{ textAlign: 'center', margin: '4px 0 10px' }}>
                 {scan === 'scanning' && (
@@ -193,7 +214,7 @@ export function Explore() {
                   (within30.length > 0
                     ? `${within30.length} worthwhile place${within30.length === 1 ? '' : 's'} inside 30 km${
                         osmCount > 0 ? ` · ${osmCount} discovered live` : ''
-                      }`
+                      } · tap any to open`
                     : scan === 'error'
                       ? 'the atlas is quiet here and the map scan failed — check your connection'
                       : 'quiet circles — see the horizon below')}
@@ -253,7 +274,12 @@ export function Explore() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {list.map((s, i) => (
                     <Reveal key={s.poi.id} delay={Math.min(i, 5) * 60}>
-                      <PlaceCard s={s} saved={persisted.saved.includes(s.poi.id)} onOpen={() => openPlace(s.poi.id)} />
+                      <PlaceCard
+                        s={s}
+                        saved={persisted.saved.includes(s.poi.id)}
+                        onOpen={() => openPlace(s.poi.id)}
+                        photo={photos[s.poi.id] ?? 'loading'}
+                      />
                     </Reveal>
                   ))}
                 </div>
