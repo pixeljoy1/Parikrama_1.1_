@@ -46,6 +46,19 @@ export function Sheet({ open, onClose, children, title }: Props) {
     }
   }, [open])
 
+  // Escape closes the sheet on desktop — every bottom sheet inherits this
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onCloseRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
   // swipe-down-to-dismiss
   useEffect(() => {
     const el = cardRef.current

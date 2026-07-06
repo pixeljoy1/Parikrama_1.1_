@@ -5,6 +5,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import wizardLogo from '../assets/wizard-logo.png'
+import { MakersPage } from '../components/MakersPage'
 import { PlaceCard } from '../components/PlaceCard'
 import { PlaceSheet } from '../components/PlaceSheet'
 import { Radar } from '../components/Radar'
@@ -28,6 +30,7 @@ export function Explore() {
   const { persisted, location, openSettings, openPlan, openLocation, placeId, openPlace } = useStore()
   const [ring, setRing] = useState<Ring>(10)
   const [invitation] = useState(nextInvitation)
+  const [makersOpen, setMakersOpen] = useState(false)
   const reduce = useMemo(prefersReducedMotion, [])
 
   const origin = location.point
@@ -348,12 +351,52 @@ export function Explore() {
           </div>
         </div>
 
-        <footer className="mono" style={{ textAlign: 'center' }}>
-          curated atlas · 190 places · live discovery via OpenStreetMap · location stays on-device
-        </footer>
+        {/* ── editorial footer with the Wizard Communications mark ── */}
+        <div style={{ padding: '48px 0 20px', textAlign: 'center' }}>
+          <div
+            className="serif ink"
+            style={{ fontSize: 'clamp(28px, 6vw, 46px)', lineHeight: 1.08, marginBottom: 10 }}
+          >
+            Travel closer. Feel further.
+          </div>
+          <p className="mono" style={{ margin: '0 0 26px' }}>
+            curated atlas · 260 places across 40 hubs · live discovery via OpenStreetMap
+          </p>
+          <button
+            onClick={() => setMakersOpen(true)}
+            aria-label="About the makers, Wizard Communications"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+              margin: '22px auto 0',
+            }}
+          >
+            <img
+              src={wizardLogo}
+              alt="Wizard Communications"
+              style={{
+                height: 20,
+                filter: persisted.theme === 'midnight' ? 'brightness(0) invert(1)' : 'brightness(0.18)',
+                opacity: 0.85,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                color: 'var(--text-secondary)',
+                letterSpacing: 0.6,
+              }}
+            >
+              CRAFTED IN KOLKATA →
+            </span>
+          </button>
+        </div>
       </div>
 
       <PlaceSheet scored={selected} onClose={() => openPlace(null)} />
+      <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
     </div>
   )
 }
