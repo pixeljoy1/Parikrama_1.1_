@@ -14,6 +14,15 @@ import { PhotoState } from '../state/usePhotos'
 import { radius } from '../theme/tokens'
 import { StarRating } from './StarRating'
 
+/** Map our editorial wow (1-10) to a Google-Maps-style renown descriptor. */
+function renown(wow: number): { label: string; color: string } {
+  if (wow >= 9.5) return { label: 'Iconic', color: 'var(--accent)' }
+  if (wow >= 8.5) return { label: 'Very popular', color: 'var(--accent)' }
+  if (wow >= 7) return { label: 'Popular', color: 'var(--accent-2)' }
+  if (wow >= 5.5) return { label: 'Well-known', color: 'var(--accent-2)' }
+  return { label: 'Hidden gem', color: 'var(--text-secondary)' }
+}
+
 interface Props {
   s: ScoredPoi
   saved: boolean
@@ -78,10 +87,41 @@ export function PlaceCard({ s, saved, onOpen, photo }: Props) {
               position: 'absolute',
               inset: 'auto 0 0 0',
               height: 40,
-              background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.18))',
+              background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.28))',
               pointerEvents: 'none',
             }}
           />
+          {/* Google-Maps-style rating pill anchored on the photo */}
+          {hasPhoto && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 10,
+                bottom: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 9px 4px 8px',
+                borderRadius: 100,
+                background: 'rgba(0,0,0,0.55)',
+                backdropFilter: 'blur(6px)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 500,
+                letterSpacing: 0.2,
+                lineHeight: 1,
+                border: '1px solid rgba(255,255,255,0.14)',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" style={{ display: 'block' }} aria-hidden>
+                <path
+                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                  fill="#F5B84A"
+                />
+              </svg>
+              {(s.poi.wow / 2).toFixed(1)}
+            </div>
+          )}
         </div>
       )}
 
@@ -94,11 +134,24 @@ export function PlaceCard({ s, saved, onOpen, photo }: Props) {
             {saved ? '♡ saved' : `${Math.round(s.match * 100)}%`}
           </span>
         </div>
-        <div className="serif" style={{ fontSize: 22, lineHeight: 1.15, margin: '8px 0 4px' }}>
+        <div className="serif" style={{ fontSize: 22, lineHeight: 1.15, margin: '8px 0 6px' }}>
           {s.poi.name}
         </div>
-        <div style={{ margin: '2px 0 8px' }}>
+        {/* Popularity row — stars + score + a renown descriptor so the
+            number reads as a familiar Maps-style popularity signal. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 10px', flexWrap: 'wrap' }}>
           <StarRating value={s.poi.wow / 2} size="compact" />
+          <span
+            className="mono"
+            style={{
+              color: renown(s.poi.wow).color,
+              textTransform: 'uppercase',
+              fontSize: 10,
+              letterSpacing: 1.4,
+            }}
+          >
+            {renown(s.poi.wow).label}
+          </span>
         </div>
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{s.poi.blurb}</p>
         <div style={{ display: 'flex', gap: 14, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>

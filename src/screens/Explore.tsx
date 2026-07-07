@@ -150,7 +150,8 @@ export function Explore() {
           : 'your fix'
 
   return (
-    <PullToRefresh onRefresh={refresh}>
+    <>
+      <PullToRefresh onRefresh={refresh}>
       <div style={{ maxWidth: 640, margin: '0 auto', padding: 'max(20px, env(safe-area-inset-top)) 22px 60px' }}>
         {/* ── top bar ── */}
         <header
@@ -441,8 +442,13 @@ export function Explore() {
         </div>
       </div>
 
+      </PullToRefresh>
+      {/* Mount overlays OUTSIDE the PullToRefresh — its inner div is
+          `transform`ed for the drag effect, which creates a new containing
+          block for position: absolute children. That would drop the place
+          sheet way down the scrolled content instead of over the viewport. */}
       <PlaceSheet scored={selected} onClose={() => openPlace(null)} />
       <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
-    </PullToRefresh>
+    </>
   )
 }

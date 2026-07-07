@@ -19,6 +19,16 @@ import { Pill } from './Pill'
 import { Sheet } from './Sheet'
 import { StarRating } from './StarRating'
 
+/** Same renown mapping as PlaceCard — kept local to avoid a shared helper file
+ * for a single 8-line function. */
+function renownForSheet(wow: number): { label: string; color: string } {
+  if (wow >= 9.5) return { label: 'Iconic destination', color: 'var(--accent)' }
+  if (wow >= 8.5) return { label: 'Very popular', color: 'var(--accent)' }
+  if (wow >= 7) return { label: 'Popular', color: 'var(--accent-2)' }
+  if (wow >= 5.5) return { label: 'Well-known', color: 'var(--accent-2)' }
+  return { label: 'Hidden gem', color: 'var(--text-secondary)' }
+}
+
 interface Props {
   scored: ScoredPoi | null
   onClose: () => void
@@ -224,8 +234,8 @@ export function PlaceSheet({ scored, onClose }: Props) {
           </h2>
 
           {/* rating strip — Google-Maps-style big stars, honest source label.
-              Editors' pick, not user reviews — we make that clear inline so
-              the number doesn't get confused with crowd-sourced ratings. */}
+              The renown label ("Iconic" / "Popular" / "Hidden gem") makes the
+              number read as the familiar popularity signal it is. */}
           <div
             style={{
               display: 'flex',
@@ -234,15 +244,24 @@ export function PlaceSheet({ scored, onClose }: Props) {
               padding: '10px 0 14px',
               marginBottom: 12,
               borderBottom: '1px solid var(--hairline)',
+              flexWrap: 'wrap',
             }}
           >
             <StarRating value={rating} size="large" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-primary)' }}>
-                How worth going, out of 5
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+              <span
+                className="mono"
+                style={{
+                  color: renownForSheet(s.poi.wow).color,
+                  textTransform: 'uppercase',
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                }}
+              >
+                {renownForSheet(s.poi.wow).label}
               </span>
               <span className="mono" style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'none', letterSpacing: 0.4 }}>
-                our editors' pick — not user reviews
+                How worth going, out of 5 — our editors' score, not user reviews
               </span>
             </div>
           </div>
