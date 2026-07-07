@@ -5,6 +5,7 @@
  * carry attribution back to their Wikipedia source.
  */
 
+import { useEffect, useState } from 'react'
 import { hubById } from '../data/hubs'
 import { interestById } from '../data/interests'
 import { INTERESTS } from '../data/interests'
@@ -45,7 +46,29 @@ export function PlaceSheet({ scored, onClose }: Props) {
   const photo = typeof photoState === 'object' ? photoState : null
   const hasGallery = photo && photo.gallery.length > 0
   const gallery = photo?.gallery ?? []
-  const restOfGallery = gallery.slice(1)
+
+  // Which photo the hero band is currently showing. The carousel below
+  // drives this — tap any thumb and the hero swaps to that photo.
+  const [heroIdx, setHeroIdx] = useState(0)
+  // Reset to the first photo when the sheet opens on a different place,
+  // OR when a new gallery arrives for the same place. Guard on both
+  // otherwise heroIdx can point past the end.
+  useEffect(() => {
+    setHeroIdx(0)
+  }, [s?.poi.id, gallery.length])
+
+  // Left/right arrow keys advance through the gallery on desktop.
+  useEffect(() => {
+    if (!s || gallery.length < 2) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setHeroIdx((i) => (i + 1) % gallery.length)
+      else if (e.key === 'ArrowLeft') setHeroIdx((i) => (i - 1 + gallery.length) % gallery.length)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [s?.poi.id, gallery.length])
+
+  const heroSrc = gallery[Math.min(heroIdx, gallery.length - 1)] ?? null
 
   return (
     <Sheet open={!!s} onClose={onClose}>
@@ -67,13 +90,28 @@ export function PlaceSheet({ scored, onClose }: Props) {
                 overflow: 'hidden',
               }}
             >
-              {hasGallery && (
+              {hasGallery && heroSrc && (
                 <>
-                  <img
-                    src={gallery[0]}
-                    alt=""
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  {/* Render every gallery image stacked, cross-fade between
+                     them via opacity so a tap on the carousel below never
+                     shows a blank frame while the new image loads. */}
+                  {gallery.map((url, i) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt=""
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        opacity: i === Math.min(heroIdx, gallery.length - 1) ? 1 : 0,
+                        transition: 'opacity 320ms cubic-bezier(0.4,0,0.2,1)',
+                        display: 'block',
+                      }}
+                    />
+                  ))}
                   <div
                     style={{
                       position: 'absolute',
@@ -83,6 +121,26 @@ export function PlaceSheet({ scored, onClose }: Props) {
                       pointerEvents: 'none',
                     }}
                   />
+                  {/* photo index pill (top-left) */}
+                  {gallery.length > 1 && (
+                    <span
+                      className="mono"
+                      style={{
+                        position: 'absolute',
+                        left: 10,
+                        top: 10,
+                        color: 'rgba(255,255,255,0.9)',
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        background: 'rgba(0,0,0,0.35)',
+                        padding: '3px 9px',
+                        borderRadius: 100,
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      {Math.min(heroIdx, gallery.length - 1) + 1} / {gallery.length}
+                    </span>
+                  )}
                   {photo?.source && (
                     <a
                       href={photo.source}
@@ -122,8 +180,8 @@ export function PlaceSheet({ scored, onClose }: Props) {
             {s.poi.blurb}
           </p>
 
-          {/* gallery — 2nd through 5th photos, horizontally scrollable */}
-          {restOfGallery.length > 0 && (
+          {/* gallery — all photos, tap any to swap the hero above */}
+          {gallery.length > 1 && (
             <div
               style={{
                 display: 'flex',
@@ -134,22 +192,46 @@ export function PlaceSheet({ scored, onClose }: Props) {
                 padding: '0 24px 4px',
               }}
             >
-              {restOfGallery.map((url, i) => (
-                <img
-                  key={`${url}-${i}`}
-                  src={url}
-                  alt=""
-                  loading="lazy"
-                  style={{
-                    width: 140,
-                    height: 90,
-                    objectFit: 'cover',
-                    borderRadius: 12,
-                    flexShrink: 0,
-                    border: '1px solid var(--hairline)',
-                  }}
-                />
-              ))}
+              {gallery.map((url, i) => {
+                const active = i === Math.min(heroIdx, gallery.length - 1)
+                return (
+                  <button
+                    key={`${url}-${i}`}
+                    onClick={() => {
+                      haptic.light()
+                      setHeroIdx(i)
+                    }}
+                    aria-label={`Show photo ${i + 1} of ${gallery.length}`}
+                    aria-current={active}
+                    style={{
+                      width: 140,
+                      height: 90,
+                      borderRadius: 12,
+                      flexShrink: 0,
+                      overflow: 'hidden',
+                      border: active ? '2px solid var(--accent)' : '1px solid var(--hairline)',
+                      padding: 0,
+                      background: 'var(--chip)',
+                      transform: active ? 'scale(1)' : 'scale(0.97)',
+                      opacity: active ? 1 : 0.75,
+                      transition: 'transform 200ms ease, opacity 200ms ease, border-color 200ms ease',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </button>
+                )
+              })}
             </div>
           )}
 
