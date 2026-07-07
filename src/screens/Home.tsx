@@ -14,15 +14,30 @@
 import { useMemo, useState } from 'react'
 import wizardLogo from '../assets/wizard-logo.png'
 import { MakersPage } from '../components/MakersPage'
+import { VersionPill } from '../components/VersionPill'
 import { Pill } from '../components/Pill'
 import { Reveal } from '../components/Reveal'
 import { PhotoQuery } from '../data/photos'
 import { poiById } from '../data/pois'
 import { hubById } from '../data/hubs'
+import { LatLng } from '../geo/geo'
 import { Trip } from '../state/types'
 import { useStore } from '../state/store'
 import { usePhotos } from '../state/usePhotos'
 import { greeting, haptic, nextInvitation } from '../state/util'
+
+/** Average lat/lng of a trip's places — the "middle of the trip" we
+ * recenter the radar on when the user taps a card. Null-safe on OSM. */
+function tripCentroidLatLng(trip: Trip, savedOsm: Record<string, any>): LatLng | null {
+  const places = trip.placeIds
+    .map((id) => poiById(id) ?? savedOsm[id])
+    .filter((p: any): p is { lat: number; lng: number } => !!p && typeof p.lat === 'number' && typeof p.lng === 'number')
+  if (places.length === 0) return null
+  return {
+    lat: places.reduce((s, p) => s + p.lat, 0) / places.length,
+    lng: places.reduce((s, p) => s + p.lng, 0) / places.length,
+  }
+}
 
 export function Home() {
   const {
@@ -106,6 +121,7 @@ export function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="pulse-dot" />
             <span className="serif" style={{ fontSize: 21 }}>Parikrama</span>
+            <VersionPill />
           </div>
           <button className="quiet-btn" onClick={() => openSettings(true)} aria-label="Settings">
             ⚙
@@ -192,15 +208,18 @@ export function Home() {
                   key={trip.id}
                   trip={trip}
                   photos={photos}
-                  onOpen={() => {
+                  onExplore={() => {
+                    // Airbnb-style: tap a trip card and you're on the map.
                     haptic.medium()
                     setActiveTrip(trip.id)
-                    // Open the trip's detail (with the "Explore this trip"
-                    // CTA at the top) — the user can also just tap a place
-                    // inside the trip to jump into it, so both paths remain.
+                    const c = tripCentroidLatLng(trip, persisted.savedOsm)
+                    if (c) location.choosePlace(`Trip · ${trip.name}`, c)
+                    go('explore')
+                  }}
+                  onSeeList={() => {
+                    haptic.light()
+                    setActiveTrip(trip.id)
                     openTrip(trip.id)
-                    // The Trips sheet is closed by default; the store's
-                    // planOpen is what surfaces the sheet, so open it too.
                     openPlanSheet(true)
                   }}
                 />
@@ -361,15 +380,19 @@ export function Home() {
   )
 }
 
-/** A single trip card with a 2×2 photo mosaic from its first four places. */
+/** A single trip card with a 2×2 photo mosaic from its first four places.
+ * Primary tap = jump to the radar centered on this trip. Secondary tap on
+ * the "N places" line = open the detail sheet with the list of saves. */
 function TripCard({
   trip,
   photos,
-  onOpen,
+  onExplore,
+  onSeeList,
 }: {
   trip: Trip
   photos: Record<string, any>
-  onOpen: () => void
+  onExplore: () => void
+  onSeeList: () => void
 }) {
   const first4 = trip.placeIds.slice(0, 4)
   // resolve up to 4 photo urls for the mosaic; fall back to fewer / none
@@ -382,20 +405,15 @@ function TripCard({
   const placeCount = trip.placeIds.length
   const missingPlaces = first4.length - urls.length
   return (
-    <button
+    <div
       className="place-card"
-      onClick={onOpen}
       style={{
-        display: 'block',
-        width: '100%',
+        position: 'relative',
         aspectRatio: '3 / 4',
         borderRadius: 18,
         border: '1px solid var(--hairline)',
         background: 'var(--surface-raised)',
         overflow: 'hidden',
-        padding: 0,
-        textAlign: 'left',
-        position: 'relative',
       }}
     >
       <div
@@ -477,17 +495,41 @@ function TripCard({
         >
           {trip.name}
         </div>
-        <div
-          className="mono"
-          style={{
-            color: urls.length > 0 ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)',
-            fontSize: 10,
-          }}
-        >
-          {placeCount} place{placeCount === 1 ? '' : 's'}
-          {missingPlaces > 0 && placeCount > 0 ? ' · loading' : ''}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 2 }}>
+          <button
+            onClick={onSeeList}
+            className="mono"
+            style={{
+              color: urls.length > 0 ? 'rgba(255,255,255,0.9)' : 'var(--text-secondary)',
+              fontSize: 10,
+              padding: '4px 8px',
+              borderRadius: 100,
+              background: urls.length > 0 ? 'rgba(0,0,0,0.28)' : 'var(--chip)',
+              backdropFilter: urls.length > 0 ? 'blur(6px)' : undefined,
+              textTransform: 'none',
+              letterSpacing: 0.6,
+            }}
+          >
+            {placeCount} place{placeCount === 1 ? '' : 's'}
+            {missingPlaces > 0 && placeCount > 0 ? ' · loading' : ''}
+          </button>
         </div>
       </div>
-    </button>
+      {/* full-card overlay button = primary tap → radar */}
+      <button
+        onClick={onExplore}
+        aria-label={`Explore ${trip.name} on the radar`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          // sits below the "N places" button in stacking order so that
+          // pill wins the tap when the user aims at it
+          zIndex: 1,
+        }}
+      />
+    </div>
   )
 }

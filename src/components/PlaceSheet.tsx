@@ -35,7 +35,7 @@ interface Props {
 }
 
 export function PlaceSheet({ scored, onClose }: Props) {
-  const { persisted, toggleSeen, openPlan, openSavePicker, addPlaceToTrip } = useStore()
+  const { persisted, toggleSeen, openPlan, openSavePicker, addPlaceToTrip, showToast } = useStore()
   const s = scored
   // "saved" = a member of at least one trip
   const savedTripIds = s ? persisted.trips.filter((t) => t.placeIds.includes(s.poi.id)).map((t) => t.id) : []
@@ -382,26 +382,70 @@ export function PlaceSheet({ scored, onClose }: Props) {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
             <Pill
               full
               variant={saved ? 'ghost' : 'accent'}
               onClick={() => {
                 haptic.doublePulse()
-                // First-save shortcut: if the traveler has exactly one trip,
-                // add straight to it. Otherwise pop the "Save to…" picker.
-                if (persisted.trips.length === 1 && !saved) {
-                  addPlaceToTrip(persisted.trips[0].id, s.poi.id, s.poi)
-                } else {
+                // Airbnb-style: one-tap save.
+                //   • No trips yet → open picker so user names their first trip
+                //   • Already saved → open picker so they can edit membership
+                //   • Otherwise (single-tap save) → drop into the active trip
+                //     and pop a toast with an "Undo" and a "Change trip" action
+                if (persisted.trips.length === 0 || saved) {
                   openSavePicker(s.poi)
+                  return
                 }
+                const active =
+                  persisted.trips.find((t) => t.id === persisted.activeTripId) ??
+                  persisted.trips[0]
+                addPlaceToTrip(active.id, s.poi.id, s.poi)
+                showToast(`Saved to ${active.name}`, {
+                  label: 'change trip',
+                  onClick: () => openSavePicker(s.poi),
+                })
               }}
             >
               {saved
                 ? `♡ In ${savedTripIds.length} trip${savedTripIds.length === 1 ? '' : 's'} — edit`
-                : '♡ Save to a trip'}
+                : persisted.trips.length === 0
+                  ? '♡ Save to a trip'
+                  : `♡ Save to ${
+                      persisted.trips.find((t) => t.id === persisted.activeTripId)?.name ??
+                      persisted.trips[0]?.name
+                    }`}
             </Pill>
           </div>
+          {/* Small always-visible line so the "which trip" is unambiguous —
+              this is the Airbnb move: a heart, plus a tiny caption. */}
+          {persisted.trips.length > 0 && (
+            <button
+              onClick={() => openSavePicker(s.poi)}
+              className="mono"
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'center',
+                padding: '4px 0 10px',
+                marginBottom: 8,
+                color: saved ? 'var(--accent-2)' : 'var(--text-secondary)',
+                letterSpacing: 1.2,
+                fontSize: 10,
+                textTransform: 'none',
+              }}
+            >
+              {saved
+                ? `in ${savedTripIds
+                    .map((id) => persisted.trips.find((t) => t.id === id)?.name)
+                    .filter(Boolean)
+                    .join(' · ')} — tap to change`
+                : `↑ goes to “${
+                    persisted.trips.find((t) => t.id === persisted.activeTripId)?.name ??
+                    persisted.trips[0]?.name
+                  }” — tap to pick a different trip`}
+            </button>
+          )}
           {saved && (
             <button
               onClick={() => {

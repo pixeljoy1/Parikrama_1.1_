@@ -10,6 +10,7 @@ import { MakersPage } from '../components/MakersPage'
 import { PlaceCard } from '../components/PlaceCard'
 import { PlaceSheet } from '../components/PlaceSheet'
 import { PullToRefresh } from '../components/PullToRefresh'
+import { VersionPill } from '../components/VersionPill'
 import { Radar } from '../components/Radar'
 import { Reveal } from '../components/Reveal'
 import { RingDial } from '../components/RingDial'
@@ -179,6 +180,9 @@ export function Explore() {
             </span>
             <span className="mono" style={{ color: 'var(--text-ghost)', marginLeft: 2 }}>⌂</span>
           </button>
+          <span onClick={(e) => e.stopPropagation()} style={{ marginRight: 'auto', marginLeft: 8 }}>
+            <VersionPill />
+          </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               className="quiet-btn"

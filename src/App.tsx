@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { LocationSheet } from './components/LocationSheet'
 import { PlanSheet } from './components/PlanSheet'
+import { SaveToast } from './components/SaveToast'
 import { SettingsSheet } from './components/SettingsSheet'
 import { TripPickerSheet } from './components/TripPickerSheet'
 import { Explore } from './screens/Explore'
@@ -44,6 +45,7 @@ export default function App() {
       <SettingsSheet />
       <PlanSheet />
       <TripPickerSheet />
+      <SaveToast />
     </div>
   )
 }

@@ -67,6 +67,10 @@ interface StoreShape {
   /** which trip's places are being viewed (null = trips overview) */
   viewingTripId: string | null
   openTrip: (id: string | null) => void
+  /** ephemeral toast: Airbnb-style bottom banner with an optional action */
+  toast: { message: string; action?: { label: string; onClick: () => void } } | null
+  showToast: (message: string, action?: { label: string; onClick: () => void }) => void
+  dismissToast: () => void
   // profile actions
   setInterests: (v: Interest[]) => void
   setPace: (v: Pace) => void
@@ -101,6 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [placeId, openPlace] = useState<string | null>(null)
   const [savingPlace, openSavePicker] = useState<Poi | null>(null)
   const [viewingTripId, openTrip] = useState<string | null>(null)
+  const [toast, setToast] = useState<StoreShape['toast']>(null)
   const location = useLocation()
 
   useEffect(() => {
@@ -140,6 +145,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       openSavePicker,
       viewingTripId,
       openTrip,
+      toast,
+      showToast: (message, action) => setToast({ message, action }),
+      dismissToast: () => setToast(null),
       totalSavedCount,
       setInterests: (interests) => patch({ interests }),
       setPace: (pace) => patch({ pace }),
@@ -196,7 +204,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleSeen: (id) => setPersisted((s) => ({ ...s, seen: toggleIn(s.seen, id) })),
       rememberLocation: (name, lat, lng) => patch({ lastLocation: { name, lat, lng } }),
     }),
-    [persisted, location, screen, settingsOpen, planOpen, locationOpen, placeId, savingPlace, viewingTripId, totalSavedCount, patch],
+    [persisted, location, screen, settingsOpen, planOpen, locationOpen, placeId, savingPlace, viewingTripId, toast, totalSavedCount, patch],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
