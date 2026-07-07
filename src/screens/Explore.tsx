@@ -99,12 +99,40 @@ export function Explore() {
     () => (origin ? scoreAround(origin, profile, 1e9) : []),
     [origin?.lat, origin?.lng, persisted.interests.join(','), persisted.pace],
   )
+  // When the radar is centered on a trip, the trip's own saved places must
+  // always show — otherwise a trip made of OSM discoveries (which aren't in
+  // POIS[]) opens to an empty radar even though those places are RIGHT THERE.
+  // We also relax the 30 km cap for these so a trip spanning multiple cities
+  // still lands them all on the plot (they clamp to the outer ring visually).
+  const tripInView = useMemo(() => {
+    if (!location.placeName?.startsWith('Trip · ')) return null
+    const name = location.placeName.replace('Trip · ', '')
+    return persisted.trips.find((t) => t.name === name) ?? null
+  }, [location.placeName, persisted.trips])
+
+  const tripPlaces = useMemo(() => {
+    if (!tripInView) return []
+    return tripInView.placeIds
+      .map((id) => POIS.find((p) => p.id === id) ?? persisted.savedOsm[id])
+      .filter((p): p is Poi => !!p)
+  }, [tripInView, persisted.savedOsm])
+
   const within30 = useMemo(() => {
     if (!origin) return []
     const curated = scoredAll.filter((s) => s.km <= 30)
     const found = scorePois(discovered, origin, profile, 30)
-    return [...curated, ...found].sort((a, b) => b.match - a.match)
-  }, [scoredAll, discovered, origin?.lat, origin?.lng, persisted.interests.join(','), persisted.pace])
+    // Trip places — no distance cap when we're centered on a trip.
+    // dedupe by id so a place that's already in curated/found isn't doubled.
+    const tripScored = scorePois(tripPlaces, origin, profile, 1e9)
+    const seen = new Set<string>()
+    const merged: typeof curated = []
+    for (const s of [...tripScored, ...curated, ...found]) {
+      if (seen.has(s.poi.id)) continue
+      seen.add(s.poi.id)
+      merged.push(s)
+    }
+    return merged.sort((a, b) => b.match - a.match)
+  }, [scoredAll, discovered, tripPlaces, origin?.lat, origin?.lng, persisted.interests.join(','), persisted.pace])
   const counts = useMemo(() => ringCounts(within30), [within30])
   const list = useMemo(
     () => within30.filter((s) => s.km <= ring).slice(0, PACE_COUNT[persisted.pace] * 2),
