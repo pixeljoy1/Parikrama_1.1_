@@ -1,16 +1,16 @@
 /**
- * WishlistSheet — the traveler's saved places.
+ * TripsSheet — a two-mode wishlist sheet.
  *
- * Two things it does that the old "plan" sheet didn't:
- *   1. Names the current context ("You're exploring: Jaipur") so users
- *      always know where they are when they open their wishlist.
- *   2. Every item has an "Explore from here →" action that recenters the
- *      map on that place, so a wishlist item can become the next
- *      exploration center in one tap. Answers "how do I jump between my
- *      saved places and browsing?" directly.
+ * Overview mode (viewingTripId === null): a compact list of the traveler's
+ * trips, each showing name + place count. Tap any to drill in.
  *
- * Also adds a photo thumbnail per item, a stronger visual affordance for
- * scanning the list, and a filter chip for hiding places you've been.
+ * Detail mode (viewingTripId set): the classic wishlist view scoped to one
+ * trip — photo thumbnails, "explore from here", maps deep link, remove.
+ * The header shows the trip name with rename + delete affordances, and a
+ * breadcrumb back to Trips.
+ *
+ * Both modes keep the "Exploring …" context banner and "keep exploring"
+ * escape hatch so the sheet never feels like a dead end.
  */
 
 import { useMemo, useState } from 'react'
@@ -23,46 +23,27 @@ import { usePhotos } from '../state/usePhotos'
 import { haptic } from '../state/util'
 import { Sheet } from './Sheet'
 
-type Filter = 'all' | 'unseen'
+export function TripsSheet() {
+  const {
+    planOpen,
+    openPlan,
+    persisted,
+    location,
+    viewingTripId,
+    openTrip,
+    createTrip,
+    renameTrip,
+    deleteTrip,
+    setActiveTrip,
+    go,
+  } = useStore()
 
-export function WishlistSheet() {
-  const { planOpen, openPlan, persisted, toggleSaved, location, openPlace } = useStore()
-  const origin = location.point
-  const [filter, setFilter] = useState<Filter>('all')
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [renameName, setRenameName] = useState('')
 
-  const items = useMemo(() => {
-    const list = persisted.saved
-      // curated atlas first, then the persisted snapshot for OSM discoveries
-      .map((id) => poiById(id) ?? persisted.savedOsm[id])
-      .filter((p): p is NonNullable<typeof p> => !!p)
-      .map((p) => ({
-        p,
-        km: origin ? distanceKm(origin, p) : null,
-        dir: origin ? compass(bearingDeg(origin, p)) : null,
-      }))
-    return list.sort((a, b) => (a.km ?? 0) - (b.km ?? 0))
-  }, [persisted.saved, persisted.savedOsm, origin])
-
-  const shown = filter === 'unseen' ? items.filter(({ p }) => !persisted.seen.includes(p.id)) : items
-  const unseenCount = items.filter(({ p }) => !persisted.seen.includes(p.id)).length
-  const seenCount = items.length - unseenCount
-
-  const photoQueries: PhotoQuery[] = useMemo(
-    () =>
-      shown.map(({ p }) => {
-        const hub = hubById(p.hub)
-        return {
-          id: p.id,
-          name: p.name,
-          context: hub ? `${hub.name} ${hub.state}` : undefined,
-          wikipedia: p.wikipedia,
-          wikidata: p.wikidata,
-        }
-      }),
-    [shown],
-  )
-  const photos = usePhotos(photoQueries)
-
+  const trip = viewingTripId ? persisted.trips.find((t) => t.id === viewingTripId) ?? null : null
   const contextLabel =
     location.status === 'live'
       ? `Exploring ${location.near?.hub.name ?? 'your fix'}`
@@ -72,9 +53,44 @@ export function WishlistSheet() {
           ? `Exploring ${location.near.hub.name}`
           : 'No location set'
 
+  const close = () => {
+    openPlan(false)
+    openTrip(null)
+    setCreating(false)
+    setNewName('')
+    setRenaming(false)
+    setRenameName('')
+  }
+
+  const commitNewTrip = () => {
+    const name = newName.trim()
+    if (!name) {
+      setCreating(false)
+      return
+    }
+    haptic.medium()
+    const id = createTrip(name)
+    setActiveTrip(id)
+    setNewName('')
+    setCreating(false)
+    openTrip(id)
+  }
+
+  const commitRename = () => {
+    const name = renameName.trim()
+    if (name && trip) renameTrip(trip.id, name)
+    setRenaming(false)
+    setRenameName('')
+  }
+
+  const gotoHome = () => {
+    close()
+    go('home')
+  }
+
   return (
-    <Sheet open={planOpen} onClose={() => openPlan(false)} title="My wishlist">
-      {/* current context — so users always know where they are when they land in the wishlist */}
+    <Sheet open={planOpen} onClose={close} title={trip ? '' : 'Your journeys'}>
+      {/* Persistent header — context banner + back to explore */}
       <div
         className="mono-lg"
         style={{
@@ -102,218 +118,429 @@ export function WishlistSheet() {
         </button>
       </div>
 
-      {items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '28px 0 12px' }}>
-          <div className="serif-i" style={{ fontSize: 22, marginBottom: 10 }}>
-            Nothing saved yet.
-          </div>
-          <p className="mono-lg" style={{ margin: 0, lineHeight: 1.7 }}>
-            tap any place → <span style={{ color: 'var(--accent)' }}>♡ Save to wishlist</span>
-            <br />
-            everything you save lives here — across trips
-          </p>
-        </div>
+      {trip ? (
+        <TripDetail
+          tripId={trip.id}
+          onBack={() => openTrip(null)}
+          onRename={() => {
+            setRenameName(trip.name)
+            setRenaming(true)
+          }}
+          renaming={renaming}
+          renameName={renameName}
+          onRenameChange={setRenameName}
+          commitRename={commitRename}
+          cancelRename={() => {
+            setRenaming(false)
+            setRenameName('')
+          }}
+          onDelete={() => {
+            if (confirm(`Delete "${trip.name}"? Places stay in any other trip.`)) {
+              deleteTrip(trip.id)
+              openTrip(null)
+            }
+          }}
+        />
       ) : (
-        <>
-          {/* filter chips */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            {(['all', 'unseen'] as const).map((f) => {
-              const on = filter === f
-              const label = f === 'all' ? `All · ${items.length}` : `To visit · ${unseenCount}`
-              return (
-                <button
-                  key={f}
-                  onClick={() => {
-                    haptic.light()
-                    setFilter(f)
-                  }}
-                  className="mono"
-                  style={{
-                    padding: '7px 14px',
-                    borderRadius: 100,
-                    border: `1px solid ${on ? 'var(--accent-line)' : 'var(--hairline)'}`,
-                    background: on ? 'var(--accent-soft)' : 'var(--chip)',
-                    color: on ? 'var(--accent)' : 'var(--text-secondary)',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-            {seenCount > 0 && (
-              <span className="mono" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-                {seenCount} been
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {shown.map(({ p, km, dir }) => {
-              const seen = persisted.seen.includes(p.id)
-              const photo = photos[p.id]
-              const hasPhoto = photo && typeof photo === 'object' && photo.hero
-              const hub = hubById(p.hub)
-              const contextName = km != null && dir ? `${fmtKm(km)} ${dir}` : hub?.name ?? p.hub
-              return (
-                <div
-                  key={p.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: '1px solid var(--hairline)',
-                    background: 'var(--surface-raised)',
-                    opacity: seen ? 0.6 : 1,
-                  }}
-                >
-                  <button
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      textAlign: 'left',
-                      padding: 0,
-                    }}
-                    onClick={() => {
-                      openPlan(false)
-                      openPlace(p.id)
-                    }}
-                  >
-                    {/* photo thumb */}
-                    <div
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 10,
-                        background: 'var(--chip)',
-                        overflow: 'hidden',
-                        flexShrink: 0,
-                        border: '1px solid var(--hairline)',
-                      }}
-                    >
-                      {hasPhoto && (
-                        <img
-                          src={(photo as { hero: string }).hero}
-                          alt=""
-                          loading="lazy"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 15.5,
-                          fontWeight: 400,
-                          textDecoration: seen ? 'line-through' : 'none',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {p.name}
-                      </div>
-                      <div className="mono" style={{ marginTop: 4 }}>
-                        {contextName}
-                        {seen ? ' · been' : ''}
-                        {p.osm ? ' · ◈' : ''}
-                      </div>
-                    </div>
-                    <span className="mono" style={{ color: 'var(--text-ghost)', flexShrink: 0 }}>
-                      ›
-                    </span>
-                  </button>
-
-                  {/* row of quick actions */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 6,
-                      marginTop: 12,
-                      paddingTop: 10,
-                      borderTop: '1px solid var(--hairline)',
-                    }}
-                  >
-                    <button
-                      className="mono"
-                      onClick={() => {
-                        haptic.medium()
-                        location.choosePlace(p.name, { lat: p.lat, lng: p.lng })
-                        openPlan(false)
-                      }}
-                      style={{
-                        flex: 1,
-                        color: 'var(--accent)',
-                        padding: '6px 4px',
-                        letterSpacing: 1.2,
-                      }}
-                    >
-                      explore from here →
-                    </button>
-                    <a
-                      className="mono"
-                      href={mapsUrl(p, p.name)}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        color: 'var(--accent-2)',
-                        textDecoration: 'none',
-                        padding: '6px 10px',
-                        letterSpacing: 1.2,
-                      }}
-                    >
-                      maps ↗
-                    </a>
-                    <button
-                      className="mono"
-                      onClick={() => {
-                        haptic.light()
-                        toggleSaved(p.id)
-                      }}
-                      style={{
-                        color: 'var(--text-ghost)',
-                        padding: '6px 10px',
-                      }}
-                      aria-label={`Remove ${p.name} from wishlist`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* footer nudge back to browsing */}
-          <div
-            style={{
-              marginTop: 22,
-              padding: '14px 16px',
-              borderRadius: 12,
-              border: '1px dashed var(--hairline)',
-              background: 'transparent',
-              textAlign: 'center',
-            }}
-          >
-            <p className="mono-lg" style={{ margin: '0 0 6px' }}>
-              your wishlist survives everywhere you explore
-            </p>
-            <button
-              className="mono"
-              onClick={() => openPlan(false)}
-              style={{ color: 'var(--accent)', letterSpacing: 1.4 }}
-            >
-              back to the radar ↗
-            </button>
-          </div>
-        </>
+        <TripsOverview
+          creating={creating}
+          newName={newName}
+          setNewName={setNewName}
+          onStartCreate={() => {
+            haptic.light()
+            setCreating(true)
+          }}
+          onCancelCreate={() => {
+            setCreating(false)
+            setNewName('')
+          }}
+          commitNewTrip={commitNewTrip}
+          gotoHome={gotoHome}
+        />
       )}
     </Sheet>
   )
 }
 
-// Named export kept as the old symbol so no import changes; the file is
-// still called PlanSheet.tsx for git-history sake.
-export { WishlistSheet as PlanSheet }
+/** ── Overview mode ── */
+function TripsOverview({
+  creating,
+  newName,
+  setNewName,
+  onStartCreate,
+  onCancelCreate,
+  commitNewTrip,
+  gotoHome,
+}: {
+  creating: boolean
+  newName: string
+  setNewName: (v: string) => void
+  onStartCreate: () => void
+  onCancelCreate: () => void
+  commitNewTrip: () => void
+  gotoHome: () => void
+}) {
+  const { persisted, openTrip, setActiveTrip, totalSavedCount } = useStore()
+
+  if (persisted.trips.length === 0 && !creating) {
+    return (
+      <div style={{ textAlign: 'center', padding: '28px 0 12px' }}>
+        <div className="serif-i" style={{ fontSize: 22, marginBottom: 10 }}>
+          No trips yet.
+        </div>
+        <p className="mono-lg" style={{ margin: '0 0 20px', lineHeight: 1.7 }}>
+          save any place → we ask which trip it belongs to
+          <br />
+          you can also start a trip fresh
+        </p>
+        <button
+          className="quiet-btn"
+          onClick={onStartCreate}
+          style={{ color: 'var(--accent)', borderColor: 'var(--accent-line)' }}
+        >
+          + start a new trip
+        </button>
+        <div style={{ marginTop: 20 }}>
+          <button className="mono" onClick={gotoHome} style={{ color: 'var(--text-secondary)' }}>
+            or visit your home ↗
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <p className="mono" style={{ margin: '0 0 14px' }}>
+        {totalSavedCount} place{totalSavedCount === 1 ? '' : 's'} across {persisted.trips.length} trip
+        {persisted.trips.length === 1 ? '' : 's'}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {persisted.trips.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => {
+              haptic.light()
+              setActiveTrip(t.id)
+              openTrip(t.id)
+            }}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              textAlign: 'left',
+              padding: '14px 16px',
+              borderRadius: 14,
+              border: `1px solid ${persisted.activeTripId === t.id ? 'var(--accent-line)' : 'var(--hairline)'}`,
+              background: persisted.activeTripId === t.id ? 'var(--accent-soft)' : 'var(--chip)',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="serif" style={{ fontSize: 20, lineHeight: 1.15 }}>{t.name}</div>
+              <div className="mono" style={{ marginTop: 4 }}>
+                {t.placeIds.length} place{t.placeIds.length === 1 ? '' : 's'}
+                {persisted.activeTripId === t.id ? ' · active' : ''}
+              </div>
+            </div>
+            <span className="mono" style={{ color: 'var(--text-ghost)', flexShrink: 0 }}>›</span>
+          </button>
+        ))}
+      </div>
+
+      {creating ? (
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginTop: 14,
+            padding: 12,
+            borderRadius: 14,
+            border: '1.5px solid var(--accent-line)',
+            background: 'var(--accent-soft)',
+          }}
+        >
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitNewTrip()
+              if (e.key === 'Escape') onCancelCreate()
+            }}
+            placeholder="Name this trip…"
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--hairline)',
+              background: 'var(--surface-raised)',
+              fontSize: 15,
+              outline: 'none',
+            }}
+          />
+          <button className="quiet-btn" onClick={commitNewTrip} style={{ color: 'var(--accent)' }}>
+            save
+          </button>
+          <button className="quiet-btn" onClick={onCancelCreate}>
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onStartCreate}
+          className="quiet-btn"
+          style={{ width: '100%', justifyContent: 'center', color: 'var(--accent)', marginTop: 14 }}
+        >
+          + create new trip
+        </button>
+      )}
+    </>
+  )
+}
+
+/** ── Detail mode ── */
+function TripDetail({
+  tripId,
+  onBack,
+  onRename,
+  renaming,
+  renameName,
+  onRenameChange,
+  commitRename,
+  cancelRename,
+  onDelete,
+}: {
+  tripId: string
+  onBack: () => void
+  onRename: () => void
+  renaming: boolean
+  renameName: string
+  onRenameChange: (v: string) => void
+  commitRename: () => void
+  cancelRename: () => void
+  onDelete: () => void
+}) {
+  const { persisted, location, openPlace, openPlan, removePlaceFromTrip } = useStore()
+  const trip = persisted.trips.find((t) => t.id === tripId)
+  const origin = location.point
+
+  const items = useMemo(() => {
+    if (!trip) return []
+    return trip.placeIds
+      .map((id) => poiById(id) ?? persisted.savedOsm[id])
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map((p) => ({
+        p,
+        km: origin ? distanceKm(origin, p) : null,
+        dir: origin ? compass(bearingDeg(origin, p)) : null,
+      }))
+      .sort((a, b) => (a.km ?? 0) - (b.km ?? 0))
+  }, [trip, persisted.savedOsm, origin])
+
+  const photoQueries: PhotoQuery[] = useMemo(
+    () =>
+      items.map(({ p }) => {
+        const hub = hubById(p.hub)
+        return {
+          id: p.id,
+          name: p.name,
+          context: hub ? `${hub.name} ${hub.state}` : undefined,
+          wikipedia: p.wikipedia,
+          wikidata: p.wikidata,
+        }
+      }),
+    [items],
+  )
+  const photos = usePhotos(photoQueries)
+
+  if (!trip) return null
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+        <button className="mono" onClick={onBack} style={{ color: 'var(--accent-2)', letterSpacing: 1.2 }}>
+          ‹ trips
+        </button>
+      </div>
+
+      {renaming ? (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <input
+            autoFocus
+            value={renameName}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename()
+              if (e.key === 'Escape') cancelRename()
+            }}
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: '1.5px solid var(--accent-line)',
+              background: 'var(--accent-soft)',
+              fontSize: 22,
+              fontFamily: 'var(--serif)',
+              outline: 'none',
+            }}
+          />
+          <button className="quiet-btn" onClick={commitRename} style={{ color: 'var(--accent)' }}>
+            save
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 6,
+          }}
+        >
+          <h2 className="serif" style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>
+            {trip.name}
+          </h2>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button className="mono" onClick={onRename} style={{ color: 'var(--text-secondary)' }}>
+              rename
+            </button>
+            <button className="mono" onClick={onDelete} style={{ color: 'var(--danger)' }}>
+              delete
+            </button>
+          </div>
+        </div>
+      )}
+      <p className="mono" style={{ margin: '0 0 20px' }}>
+        {items.length} place{items.length === 1 ? '' : 's'}
+      </p>
+
+      {items.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '18px 0 12px' }}>
+          <div className="serif-i" style={{ fontSize: 20, marginBottom: 8 }}>
+            This trip is empty.
+          </div>
+          <p className="mono-lg" style={{ margin: 0 }}>
+            explore, then tap the heart to save into this trip
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map(({ p, km, dir }) => {
+            const seen = persisted.seen.includes(p.id)
+            const photo = photos[p.id]
+            const hasPhoto = photo && typeof photo === 'object' && photo.hero
+            const hub = hubById(p.hub)
+            const contextName = km != null && dir ? `${fmtKm(km)} ${dir}` : hub?.name ?? p.hub
+            return (
+              <div
+                key={p.id}
+                style={{
+                  padding: 12,
+                  borderRadius: 14,
+                  border: '1px solid var(--hairline)',
+                  background: 'var(--surface-raised)',
+                  opacity: seen ? 0.6 : 1,
+                }}
+              >
+                <button
+                  onClick={() => {
+                    openPlan(false)
+                    openPlace(p.id)
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%' }}
+                >
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 10,
+                      background: 'var(--chip)',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      border: '1px solid var(--hairline)',
+                    }}
+                  >
+                    {hasPhoto && (
+                      <img
+                        src={(photo as { hero: string }).hero}
+                        alt=""
+                        loading="lazy"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 15.5,
+                        fontWeight: 400,
+                        textDecoration: seen ? 'line-through' : 'none',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {p.name}
+                    </div>
+                    <div className="mono" style={{ marginTop: 4 }}>
+                      {contextName}
+                      {seen ? ' · been' : ''}
+                      {p.osm ? ' · ◈' : ''}
+                    </div>
+                  </div>
+                  <span className="mono" style={{ color: 'var(--text-ghost)', flexShrink: 0 }}>›</span>
+                </button>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    marginTop: 12,
+                    paddingTop: 10,
+                    borderTop: '1px solid var(--hairline)',
+                  }}
+                >
+                  <button
+                    className="mono"
+                    onClick={() => {
+                      haptic.medium()
+                      location.choosePlace(p.name, { lat: p.lat, lng: p.lng })
+                      openPlan(false)
+                    }}
+                    style={{ flex: 1, color: 'var(--accent)', padding: '6px 4px', letterSpacing: 1.2 }}
+                  >
+                    explore from here →
+                  </button>
+                  <a
+                    className="mono"
+                    href={mapsUrl(p, p.name)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: 'var(--accent-2)', textDecoration: 'none', padding: '6px 10px', letterSpacing: 1.2 }}
+                  >
+                    maps ↗
+                  </a>
+                  <button
+                    className="mono"
+                    onClick={() => {
+                      haptic.light()
+                      removePlaceFromTrip(trip.id, p.id)
+                    }}
+                    style={{ color: 'var(--text-ghost)', padding: '6px 10px' }}
+                    aria-label={`Remove ${p.name} from ${trip.name}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Keep the old name as an alias so imports don't churn
+export { TripsSheet as PlanSheet }

@@ -22,9 +22,11 @@ interface Props {
 }
 
 export function PlaceSheet({ scored, onClose }: Props) {
-  const { persisted, toggleSaved, toggleSeen, openPlan } = useStore()
+  const { persisted, toggleSeen, openPlan, openSavePicker, addPlaceToTrip } = useStore()
   const s = scored
-  const saved = !!s && persisted.saved.includes(s.poi.id)
+  // "saved" = a member of at least one trip
+  const savedTripIds = s ? persisted.trips.filter((t) => t.placeIds.includes(s.poi.id)).map((t) => t.id) : []
+  const saved = savedTripIds.length > 0
   const seen = !!s && persisted.seen.includes(s.poi.id)
 
   // fetch a full gallery lazily on open — cheap thanks to the shared cache
@@ -214,10 +216,18 @@ export function PlaceSheet({ scored, onClose }: Props) {
               variant={saved ? 'ghost' : 'accent'}
               onClick={() => {
                 haptic.doublePulse()
-                toggleSaved(s.poi.id, s.poi)
+                // First-save shortcut: if the traveler has exactly one trip,
+                // add straight to it. Otherwise pop the "Save to…" picker.
+                if (persisted.trips.length === 1 && !saved) {
+                  addPlaceToTrip(persisted.trips[0].id, s.poi.id, s.poi)
+                } else {
+                  openSavePicker(s.poi)
+                }
               }}
             >
-              {saved ? '♡ In wishlist — tap to remove' : '♡ Save to wishlist'}
+              {saved
+                ? `♡ In ${savedTripIds.length} trip${savedTripIds.length === 1 ? '' : 's'} — edit`
+                : '♡ Save to a trip'}
             </Pill>
           </div>
           {saved && (
@@ -237,7 +247,7 @@ export function PlaceSheet({ scored, onClose }: Props) {
                 letterSpacing: 1.4,
               }}
             >
-              view my wishlist →
+              view my trips →
             </button>
           )}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>

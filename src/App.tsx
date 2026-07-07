@@ -1,15 +1,17 @@
 /**
  * App — top-level shell & navigation.
- * Onboarding → Explore, with the house cross-fade between screens and the
- * global sheets (location / settings / plan) mounted once at the shell level
- * so they are reachable from anywhere.
+ * Onboarding → Home → Explore, with the house cross-fade between screens
+ * and the global sheets (location / settings / trips / save picker) mounted
+ * once at the shell level so they are reachable from anywhere.
  */
 
 import { useEffect, useState } from 'react'
 import { LocationSheet } from './components/LocationSheet'
 import { PlanSheet } from './components/PlanSheet'
 import { SettingsSheet } from './components/SettingsSheet'
+import { TripPickerSheet } from './components/TripPickerSheet'
 import { Explore } from './screens/Explore'
+import { Home } from './screens/Home'
 import { Onboarding } from './screens/Onboarding'
 import { useStore } from './state/store'
 
@@ -34,12 +36,14 @@ export default function App() {
         }}
       >
         {display === 'onboarding' && <Onboarding />}
+        {display === 'home' && <Home />}
         {display === 'explore' && <Explore />}
       </div>
 
       <LocationSheet />
       <SettingsSheet />
       <PlanSheet />
+      <TripPickerSheet />
     </div>
   )
 }

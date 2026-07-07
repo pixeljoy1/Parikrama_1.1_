@@ -27,7 +27,7 @@ import { Pill } from '../components/Pill'
 type ScanState = 'idle' | 'scanning' | 'done' | 'error'
 
 export function Explore() {
-  const { persisted, location, openSettings, openPlan, openLocation, placeId, openPlace } = useStore()
+  const { persisted, location, go, openSettings, openPlan, openLocation, placeId, openPlace, rememberLocation, totalSavedCount } = useStore()
   const [ring, setRing] = useState<Ring>(10)
   const [invitation] = useState(nextInvitation)
   const [makersOpen, setMakersOpen] = useState(false)
@@ -35,6 +35,16 @@ export function Explore() {
 
   const origin = location.point
   const profile = { interests: persisted.interests, pace: persisted.pace }
+
+  // Persist the current center whenever it changes — powers "continue where
+  // you left off" on Home. Prefer the human name of the place when we have
+  // one, else the nearest hub.
+  useEffect(() => {
+    if (!origin) return
+    const name = location.placeName ?? location.near?.hub.name
+    if (!name) return
+    rememberLocation(name, origin.lat, origin.lng)
+  }, [origin?.lat, origin?.lng, location.placeName, location.near?.hub.id])
 
   // live discovery: scan OpenStreetMap around the center so the app works
   // anywhere in India — Kalpetta's waterfalls, not just the curated hubs
@@ -128,18 +138,35 @@ export function Explore() {
           className="reveal d1"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 26 }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => {
+              haptic.light()
+              go('home')
+            }}
+            aria-label="Back to home"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '4px 12px 4px 4px',
+              borderRadius: 100,
+              background: 'transparent',
+            }}
+          >
             <span className="pulse-dot" />
-            <span className="serif" style={{ fontSize: 21 }}>Parikrama</span>
-          </div>
+            <span className="serif" style={{ fontSize: 21 }}>
+              Parikrama
+            </span>
+            <span className="mono" style={{ color: 'var(--text-ghost)', marginLeft: 2 }}>⌂</span>
+          </button>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               className="quiet-btn"
               onClick={() => openPlan(true)}
-              aria-label={`Open wishlist (${persisted.saved.length})`}
-              style={persisted.saved.length > 0 ? { color: 'var(--accent)', borderColor: 'var(--accent-line)' } : undefined}
+              aria-label={`Open trips (${totalSavedCount})`}
+              style={totalSavedCount > 0 ? { color: 'var(--accent)', borderColor: 'var(--accent-line)' } : undefined}
             >
-              ♡ {persisted.saved.length > 0 ? `Wishlist · ${persisted.saved.length}` : 'Wishlist'}
+              ♡ {totalSavedCount > 0 ? `Trips · ${totalSavedCount}` : 'Trips'}
             </button>
             <button className="quiet-btn" onClick={() => openSettings(true)} aria-label="Settings">
               ⚙
@@ -284,7 +311,7 @@ export function Explore() {
                     <Reveal key={s.poi.id} delay={Math.min(i, 5) * 60}>
                       <PlaceCard
                         s={s}
-                        saved={persisted.saved.includes(s.poi.id)}
+                        saved={persisted.trips.some((t) => t.placeIds.includes(s.poi.id))}
                         onOpen={() => openPlace(s.poi.id)}
                         photo={photos[s.poi.id] ?? 'loading'}
                       />
