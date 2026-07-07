@@ -5,7 +5,7 @@
  * carry attribution back to their Wikipedia source.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { hubById } from '../data/hubs'
 import { interestById } from '../data/interests'
 import { INTERESTS } from '../data/interests'
@@ -14,8 +14,10 @@ import { fmtKm, mapsUrl } from '../geo/geo'
 import { useStore } from '../state/store'
 import { fmtMinutes, haptic } from '../state/util'
 import { usePhoto } from '../state/usePhotos'
+import { Lightbox } from './Lightbox'
 import { Pill } from './Pill'
 import { Sheet } from './Sheet'
+import { StarRating } from './StarRating'
 
 interface Props {
   scored: ScoredPoi | null
@@ -70,13 +72,55 @@ export function PlaceSheet({ scored, onClose }: Props) {
 
   const heroSrc = gallery[Math.min(heroIdx, gallery.length - 1)] ?? null
 
+  // Lightbox open state + horizontal-swipe detection on the hero. If the
+  // user drags more than ~40px sideways it's a swipe (advance the gallery,
+  // don't open the lightbox); if they release under that threshold it was
+  // a tap and we open the lightbox.
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const dragStartX = useRef<number | null>(null)
+  const dragged = useRef(false)
+  const onHeroPointerDown = (e: React.PointerEvent) => {
+    dragStartX.current = e.clientX
+    dragged.current = false
+  }
+  const onHeroPointerMove = (e: React.PointerEvent) => {
+    if (dragStartX.current == null) return
+    if (Math.abs(e.clientX - dragStartX.current) > 12) dragged.current = true
+  }
+  const onHeroPointerUp = (e: React.PointerEvent) => {
+    if (dragStartX.current == null) return
+    const dx = e.clientX - dragStartX.current
+    dragStartX.current = null
+    if (Math.abs(dx) < 40) {
+      // treat as tap → open lightbox
+      if (gallery.length > 0) {
+        haptic.light()
+        setLightboxOpen(true)
+      }
+    } else if (gallery.length > 1) {
+      haptic.light()
+      if (dx > 0) setHeroIdx((i) => (i - 1 + gallery.length) % gallery.length)
+      else setHeroIdx((i) => (i + 1) % gallery.length)
+    }
+  }
+  // Rating: our editorial wow (1–10) converted to Google-Maps-style 0–5.
+  const rating = s ? Math.max(0, Math.min(5, s.poi.wow / 2)) : 0
+
   return (
     <Sheet open={!!s} onClose={onClose}>
       {s && (
         <div>
-          {/* hero band — full-bleed above the sheet padding */}
+          {/* hero band — full-bleed above the sheet padding; tap to open the
+              lightbox, drag horizontally to advance the gallery */}
           {(hasGallery || photoState === 'loading') && (
             <div
+              onPointerDown={hasGallery ? onHeroPointerDown : undefined}
+              onPointerMove={hasGallery ? onHeroPointerMove : undefined}
+              onPointerUp={hasGallery ? onHeroPointerUp : undefined}
+              onPointerCancel={() => {
+                dragStartX.current = null
+                dragged.current = false
+              }}
               style={{
                 position: 'relative',
                 width: 'calc(100% + 48px)',
@@ -88,6 +132,9 @@ export function PlaceSheet({ scored, onClose }: Props) {
                 backgroundSize: '200% 100%',
                 animation: photoState === 'loading' ? 'shimmer 1.6s linear infinite' : undefined,
                 overflow: 'hidden',
+                cursor: hasGallery ? 'zoom-in' : undefined,
+                touchAction: 'pan-y',
+                userSelect: 'none',
               }}
             >
               {hasGallery && heroSrc && (
@@ -172,9 +219,31 @@ export function PlaceSheet({ scored, onClose }: Props) {
           <div className="mono" style={{ color: 'var(--accent-2)', marginBottom: 8 }}>
             {fmtKm(s.km)} {s.dir} of you · {Math.round(s.match * 100)}% your kind of place
           </div>
-          <h2 className="serif" style={{ fontSize: 30, lineHeight: 1.1, margin: '0 0 12px' }}>
+          <h2 className="serif" style={{ fontSize: 30, lineHeight: 1.1, margin: '0 0 10px' }}>
             {s.poi.name}
           </h2>
+
+          {/* rating strip — Google Maps–style big stars, honest source label */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '10px 0 14px',
+              marginBottom: 12,
+              borderBottom: '1px solid var(--hairline)',
+            }}
+          >
+            <StarRating value={rating} size="large" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span className="mono" style={{ color: 'var(--text-secondary)' }}>
+                Parikrama editorial
+              </span>
+              <span className="mono" style={{ color: 'var(--text-ghost)', fontSize: 10 }}>
+                out of 5 · from our worthy score
+              </span>
+            </div>
+          </div>
 
           <p style={{ fontSize: 15, lineHeight: 1.6, margin: '0 0 16px', color: 'var(--text-primary)' }}>
             {s.poi.blurb}
@@ -352,6 +421,17 @@ export function PlaceSheet({ scored, onClose }: Props) {
             </p>
           )}
         </div>
+      )}
+      {s && (
+        <Lightbox
+          open={lightboxOpen}
+          photos={gallery}
+          index={Math.min(heroIdx, Math.max(0, gallery.length - 1))}
+          onIndexChange={setHeroIdx}
+          onClose={() => setLightboxOpen(false)}
+          caption={s.poi.name}
+          sourceUrl={photo?.source}
+        />
       )}
     </Sheet>
   )

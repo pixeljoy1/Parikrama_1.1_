@@ -12,6 +12,7 @@ import { fmtKm } from '../geo/geo'
 import { fmtMinutes, haptic } from '../state/util'
 import { PhotoState } from '../state/usePhotos'
 import { radius } from '../theme/tokens'
+import { StarRating } from './StarRating'
 
 interface Props {
   s: ScoredPoi
@@ -93,8 +94,11 @@ export function PlaceCard({ s, saved, onOpen, photo }: Props) {
             {saved ? '♡ saved' : `${Math.round(s.match * 100)}%`}
           </span>
         </div>
-        <div className="serif" style={{ fontSize: 22, lineHeight: 1.15, margin: '8px 0 6px' }}>
+        <div className="serif" style={{ fontSize: 22, lineHeight: 1.15, margin: '8px 0 4px' }}>
           {s.poi.name}
+        </div>
+        <div style={{ margin: '2px 0 8px' }}>
+          <StarRating value={s.poi.wow / 2} size="compact" />
         </div>
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{s.poi.blurb}</p>
         <div style={{ display: 'flex', gap: 14, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
