@@ -223,6 +223,69 @@ export function Explore() {
               your fix is outside India — pick a hub to explore from
             </p>
           )}
+          {/* Trip context banner — when the radar is centered on a trip's
+              centroid, make that unmistakable so the user knows why the
+              header reads what it does. */}
+          {location.placeName?.startsWith('Trip · ') && (() => {
+            const tripName = location.placeName!.replace('Trip · ', '')
+            const trip = persisted.trips.find((t) => t.name === tripName)
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginTop: 14,
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: 'var(--accent-soft)',
+                  border: '1px solid var(--accent-line)',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                    minWidth: 0,
+                  }}
+                >
+                  <span className="mono" style={{ color: 'var(--accent)', letterSpacing: 1.2 }}>
+                    ◈ Viewing trip
+                  </span>
+                  <span
+                    className="serif"
+                    style={{
+                      fontSize: 17,
+                      lineHeight: 1.15,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {tripName}
+                    {trip ? ` · ${trip.placeIds.length} saved` : ''}
+                  </span>
+                </span>
+                <button
+                  onClick={() => openPlan(true)}
+                  className="mono"
+                  style={{
+                    color: 'var(--accent)',
+                    letterSpacing: 1.2,
+                    padding: '6px 10px',
+                    borderRadius: 100,
+                    background: 'transparent',
+                    border: '1px solid var(--accent-line)',
+                    flexShrink: 0,
+                  }}
+                >
+                  see list
+                </button>
+              </div>
+            )
+          })()}
         </section>
 
         {!origin ? (

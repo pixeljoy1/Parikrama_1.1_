@@ -43,11 +43,20 @@ export function LocationSheet() {
 
   const pickPlace = (r: GeoPlace) => {
     haptic.medium()
-    location.choosePlace(r.name, { lat: r.lat, lng: r.lng })
-    setQuery('')
-    setResults([])
-    setSearch('idle')
-    openLocation(false)
+    // Dismiss the mobile keyboard BEFORE we start closing the sheet — on
+    // Android, the visual-viewport resize when the keyboard hides can shift
+    // the sheet mid-animation and eat the tap. Blurring first avoids that
+    // race entirely.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    // give the keyboard-hide animation a beat before we mutate the
+    // location + close the sheet, so the transition looks clean
+    window.setTimeout(() => {
+      location.choosePlace(r.name, { lat: r.lat, lng: r.lng })
+      setQuery('')
+      setResults([])
+      setSearch('idle')
+      openLocation(false)
+    }, 60)
   }
 
   const statusLine =
@@ -85,6 +94,9 @@ export function LocationSheet() {
       <form
         onSubmit={(e) => {
           e.preventDefault()
+          // dismiss the Android keyboard while results load so the sheet
+          // can slide back into its natural position
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
           runSearch()
         }}
         style={{ display: 'flex', gap: 8, marginBottom: 14 }}
@@ -97,6 +109,11 @@ export function LocationSheet() {
           }}
           placeholder="Kalpetta, Ziro, Orchha, Gokarna…"
           enterKeyHint="search"
+          inputMode="search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="words"
+          spellCheck={false}
           style={{
             flex: 1,
             minWidth: 0,
@@ -104,7 +121,9 @@ export function LocationSheet() {
             borderRadius: 14,
             border: '1px solid var(--hairline)',
             background: 'var(--chip)',
-            fontSize: 15,
+            // 16px prevents iOS Safari auto-zoom on focus, which
+            // rewrites the viewport and confuses the sheet's position
+            fontSize: 16,
             outline: 'none',
           }}
         />
