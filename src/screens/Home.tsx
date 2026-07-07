@@ -32,6 +32,7 @@ export function Home() {
     openSettings,
     openLocation,
     openTrip,
+    openPlan: openPlanSheet,
     createTrip,
     setActiveTrip,
     totalSavedCount,
@@ -194,7 +195,13 @@ export function Home() {
                   onOpen={() => {
                     haptic.medium()
                     setActiveTrip(trip.id)
+                    // Open the trip's detail (with the "Explore this trip"
+                    // CTA at the top) — the user can also just tap a place
+                    // inside the trip to jump into it, so both paths remain.
                     openTrip(trip.id)
+                    // The Trips sheet is closed by default; the store's
+                    // planOpen is what surfaces the sheet, so open it too.
+                    openPlanSheet(true)
                   }}
                 />
               ))}

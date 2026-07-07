@@ -9,6 +9,7 @@ import wizardLogo from '../assets/wizard-logo.png'
 import { MakersPage } from '../components/MakersPage'
 import { PlaceCard } from '../components/PlaceCard'
 import { PlaceSheet } from '../components/PlaceSheet'
+import { PullToRefresh } from '../components/PullToRefresh'
 import { Radar } from '../components/Radar'
 import { Reveal } from '../components/Reveal'
 import { RingDial } from '../components/RingDial'
@@ -52,6 +53,24 @@ export function Explore() {
   const [scan, setScan] = useState<ScanState>('idle')
   const [scanErr, setScanErr] = useState<string>('')
   const [rescan, setRescan] = useState(0)
+
+  // slide-down-from-top gesture on the whole scroller. On refresh we bust the
+  // day-long OSM cache for the current point and bump rescan so the effect
+  // above re-fetches, then re-request a fresh GPS fix if we're on live.
+  const refresh = async () => {
+    if (origin) {
+      const key = `parikrama.osm.v1.${origin.lat.toFixed(2)},${origin.lng.toFixed(2)}`
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    }
+    setRescan((n) => n + 1)
+    if (location.status === 'live' || location.status === 'denied') location.detect()
+    // give the scan a moment to acknowledge before releasing the spinner
+    await new Promise((r) => setTimeout(r, 800))
+  }
   useEffect(() => {
     if (!origin) return
     let cancelled = false
@@ -131,7 +150,7 @@ export function Explore() {
           : 'your fix'
 
   return (
-    <div className="screen" style={{ overflowY: 'auto' }}>
+    <PullToRefresh onRefresh={refresh}>
       <div style={{ maxWidth: 640, margin: '0 auto', padding: 'max(20px, env(safe-area-inset-top)) 22px 60px' }}>
         {/* ── top bar ── */}
         <header
@@ -424,6 +443,6 @@ export function Explore() {
 
       <PlaceSheet scored={selected} onClose={() => openPlace(null)} />
       <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
-    </div>
+    </PullToRefresh>
   )
 }

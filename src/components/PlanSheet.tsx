@@ -300,6 +300,18 @@ function TripsOverview({
 }
 
 /** ── Detail mode ── */
+/** Average lat/lng of a trip's saved places — the "center of gravity"
+ * we recenter the radar on when the user taps "Explore this trip". */
+function tripCentroid(placeIds: string[], savedOsm: Record<string, any>) {
+  const places = placeIds
+    .map((id) => poiById(id) ?? savedOsm[id])
+    .filter((p: any): p is { lat: number; lng: number } => !!p && typeof p.lat === 'number' && typeof p.lng === 'number')
+  if (places.length === 0) return null
+  const lat = places.reduce((s, p) => s + p.lat, 0) / places.length
+  const lng = places.reduce((s, p) => s + p.lng, 0) / places.length
+  return { lat, lng }
+}
+
 function TripDetail({
   tripId,
   onBack,
@@ -321,9 +333,23 @@ function TripDetail({
   cancelRename: () => void
   onDelete: () => void
 }) {
-  const { persisted, location, openPlace, openPlan, removePlaceFromTrip } = useStore()
+  const { persisted, location, openPlace, openPlan, openTrip, removePlaceFromTrip, go } = useStore()
   const trip = persisted.trips.find((t) => t.id === tripId)
   const origin = location.point
+  const centroid = useMemo(
+    () => (trip ? tripCentroid(trip.placeIds, persisted.savedOsm) : null),
+    [trip, persisted.savedOsm],
+  )
+  const exploreThisTrip = () => {
+    if (!trip || !centroid) return
+    haptic.medium()
+    // Recenter the radar on the trip's center of gravity and jump to Explore.
+    // The location "name" carries the trip label so the header reads sensibly.
+    location.choosePlace(`Trip · ${trip.name}`, centroid)
+    openPlan(false)
+    openTrip(null)
+    go('explore')
+  }
 
   const items = useMemo(() => {
     if (!trip) return []
@@ -412,9 +438,42 @@ function TripDetail({
           </div>
         </div>
       )}
-      <p className="mono" style={{ margin: '0 0 20px' }}>
+      <p className="mono" style={{ margin: '0 0 14px' }}>
         {items.length} place{items.length === 1 ? '' : 's'}
       </p>
+
+      {/* Primary CTA — recenter the radar on this trip's centroid and jump
+          to Explore. The trip's saved places light up around the new center,
+          so the user can add more to the same trip in one flow. */}
+      {items.length > 0 && centroid && (
+        <button
+          onClick={exploreThisTrip}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            gap: 12,
+            padding: '14px 18px',
+            borderRadius: 14,
+            border: '1.5px solid var(--accent-line)',
+            background: 'var(--accent-soft)',
+            color: 'var(--accent)',
+            marginBottom: 18,
+            textAlign: 'left',
+          }}
+        >
+          <span>
+            <span style={{ fontSize: 15, fontWeight: 500, display: 'block' }}>
+              Explore this trip on the radar
+            </span>
+            <span className="mono" style={{ display: 'block', marginTop: 3, textTransform: 'none' }}>
+              recenter the map on {trip.name}
+            </span>
+          </span>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>→</span>
+        </button>
+      )}
 
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '18px 0 12px' }}>

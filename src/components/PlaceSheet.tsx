@@ -223,7 +223,9 @@ export function PlaceSheet({ scored, onClose }: Props) {
             {s.poi.name}
           </h2>
 
-          {/* rating strip — Google Maps–style big stars, honest source label */}
+          {/* rating strip — Google-Maps-style big stars, honest source label.
+              Editors' pick, not user reviews — we make that clear inline so
+              the number doesn't get confused with crowd-sourced ratings. */}
           <div
             style={{
               display: 'flex',
@@ -235,12 +237,12 @@ export function PlaceSheet({ scored, onClose }: Props) {
             }}
           >
             <StarRating value={rating} size="large" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span className="mono" style={{ color: 'var(--text-secondary)' }}>
-                Parikrama editorial
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-primary)' }}>
+                How worth going, out of 5
               </span>
-              <span className="mono" style={{ color: 'var(--text-ghost)', fontSize: 10 }}>
-                out of 5 · from our worthy score
+              <span className="mono" style={{ color: 'var(--text-secondary)', fontSize: 10, textTransform: 'none', letterSpacing: 0.4 }}>
+                our editors' pick — not user reviews
               </span>
             </div>
           </div>
