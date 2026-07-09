@@ -14,6 +14,7 @@ import { VersionPill } from '../components/VersionPill'
 import { Radar } from '../components/Radar'
 import { Reveal } from '../components/Reveal'
 import { RingDial } from '../components/RingDial'
+import { SelectedPlacePreview } from '../components/SelectedPlacePreview'
 import { discoverAround } from '../data/discover'
 import { HUBS, horizonHubs, hubById } from '../data/hubs'
 import { PhotoQuery } from '../data/photos'
@@ -152,10 +153,16 @@ export function Explore() {
 
   // fetch Wikimedia photos for the visible shortlist + the top few beyond it
   // (12-place cap keeps the network cost bounded — Wikipedia loves us if we
-  // don't hammer their opensearch, and the cache keeps repeat visits free)
+  // don't hammer their opensearch, and the cache keeps repeat visits free).
+  // Always include the currently-selected place so the big header thumbnail
+  // has a photo even if it's a low-ranked/OSM/trip-only entry.
   const photoQueries: PhotoQuery[] = useMemo(() => {
     const chosen = within30.slice(0, 12)
-    return chosen.map((s) => {
+    const seen = new Set(chosen.map((s) => s.poi.id))
+    const extras = placeId && !seen.has(placeId)
+      ? [within30.find((s) => s.poi.id === placeId) ?? scoredAll.find((s) => s.poi.id === placeId)].filter(Boolean)
+      : []
+    return [...chosen, ...(extras as typeof chosen)].map((s) => {
       const hub = hubById(s.poi.hub)
       return {
         id: s.poi.id,
@@ -165,7 +172,7 @@ export function Explore() {
         wikidata: s.poi.wikidata,
       }
     })
-  }, [within30])
+  }, [within30, scoredAll, placeId])
   const photos = usePhotos(photoQueries)
 
   const locLabel = !origin
@@ -370,6 +377,18 @@ export function Explore() {
                       : 'quiet circles — see the horizon below')}
               </p>
             </Reveal>
+
+            {/* ── selected place header — big, attractive, with badge ── */}
+            {selected && (
+              <Reveal>
+                <SelectedPlacePreview
+                  scored={selected}
+                  onOpen={() => openPlace(selected.poi.id)}
+                  onDismiss={() => openPlace(null)}
+                  photo={photos[selected.poi.id] ?? 'loading'}
+                />
+              </Reveal>
+            )}
 
             {/* ── ring dial ── */}
             <Reveal style={{ marginBottom: 30 }}>

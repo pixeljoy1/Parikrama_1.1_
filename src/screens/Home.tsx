@@ -11,12 +11,13 @@
  *   4. A Wizard-signed footer, consistent with the SoundTherapy footer.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import wizardLogo from '../assets/wizard-logo.png'
 import { MakersPage } from '../components/MakersPage'
 import { VersionPill } from '../components/VersionPill'
 import { Pill } from '../components/Pill'
 import { Reveal } from '../components/Reveal'
+import { discoverAround } from '../data/discover'
 import { PhotoQuery } from '../data/photos'
 import { poiById } from '../data/pois'
 import { hubById } from '../data/hubs'
@@ -59,6 +60,21 @@ export function Home() {
 
   const trips = persisted.trips
   const last = persisted.lastLocation
+
+  // Warm the OSM discovery cache for every trip centroid, so tapping a trip
+  // card takes the user to a radar that populates instantly with surrounding
+  // places instead of showing an empty ring while the Overpass scan runs.
+  // discoverAround self-caches per ~1 km grid cell for a day; this is a
+  // fire-and-forget primer.
+  useEffect(() => {
+    for (const trip of trips) {
+      const c = tripCentroidLatLng(trip, persisted.savedOsm)
+      if (!c) continue
+      discoverAround(c, 30).catch(() => {
+        /* silent — Explore will retry with a visible spinner */
+      })
+    }
+  }, [trips, persisted.savedOsm])
 
   // preload the first-4 photos across all trips so the mosaics feel instant
   const previewQueries: PhotoQuery[] = useMemo(() => {

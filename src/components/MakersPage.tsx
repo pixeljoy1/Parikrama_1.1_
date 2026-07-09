@@ -55,16 +55,53 @@ export function MakersPage({ open, onClose }: { open: boolean; onClose: () => vo
         transition: 'opacity 480ms ease',
       }}
     >
-      <button onClick={onClose} aria-label="Back" style={backBtn}>
-        <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
-        <span>Back</span>
-      </button>
+      {/* sticky top bar — always visible while the user scrolls the page */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px 12px',
+          background: midnight
+            ? 'linear-gradient(180deg, rgba(18,16,13,0.85), rgba(18,16,13,0.0))'
+            : 'linear-gradient(180deg, rgba(246,241,231,0.85), rgba(246,241,231,0.0))',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <button onClick={onClose} aria-label="Back" style={backBtn}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
+          <span>Back</span>
+        </button>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 40,
+            height: 40,
+            borderRadius: 100,
+            background: 'var(--panel)',
+            border: '1px solid var(--hairline)',
+            backdropFilter: 'blur(10px)',
+            fontSize: 18,
+            color: 'var(--text-primary)',
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      </div>
 
       <div
         style={{
           maxWidth: 620,
           margin: '0 auto',
-          padding: '96px 28px 64px',
+          padding: '48px 28px 64px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -176,9 +213,6 @@ export function MakersPage({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 const backBtn: React.CSSProperties = {
-  position: 'absolute',
-  top: 16,
-  left: 20,
   display: 'inline-flex',
   alignItems: 'center',
   gap: 8,
@@ -190,5 +224,4 @@ const backBtn: React.CSSProperties = {
   border: '1px solid var(--hairline)',
   fontSize: 15,
   color: 'var(--text-primary)',
-  zIndex: 5,
 }
