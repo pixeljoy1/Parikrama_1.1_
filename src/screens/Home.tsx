@@ -131,7 +131,7 @@ export function Home() {
 
   return (
     <div className="screen" style={{ overflowY: 'auto' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: 'max(20px, env(safe-area-inset-top)) 22px 60px' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto', padding: 'max(20px, env(safe-area-inset-top)) 28px 60px' }}>
         {/* ── top bar ── */}
         <header
           className="reveal d1"
@@ -218,15 +218,27 @@ export function Home() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: 14,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: 18,
               }}
             >
-              {trips.map((trip) => (
+              {trips.map((trip) => {
+                // Precompute per-tile { id, name, url } here so TripCard can
+                // render a graceful monogram placeholder when a Wikimedia
+                // photo hasn't returned (or the POI has no wiki link).
+                const enrichedTiles = trip.placeIds.map((id) => {
+                  const poi = poiById(id) ?? persisted.savedOsm[id]
+                  const p = photos[id]
+                  const url = p && typeof p === 'object' && (p as { hero?: string }).hero
+                    ? (p as { hero: string }).hero
+                    : null
+                  return { id, name: poi?.name ?? '', url }
+                })
+                return (
                 <TripCard
                   key={trip.id}
                   trip={trip}
-                  photos={photos}
+                  tiles={enrichedTiles}
                   onOpenPoi={(id) => {
                     // Decoupled from the whole-trip view: recenter the radar
                     // on THIS specific POI and highlight it, so the user lands
@@ -247,7 +259,8 @@ export function Home() {
                     openPlanSheet(true)
                   }}
                 />
-              ))}
+                )
+              })}
               {creatingTrip ? (
                 <div
                   style={{
@@ -428,21 +441,16 @@ function useMedia(query: string): boolean {
  * decoupling from the whole-trip view. */
 function TripCard({
   trip,
-  photos,
+  tiles,
   onOpenPoi,
   onSeeList,
 }: {
   trip: Trip
-  photos: Record<string, any>
+  tiles: Array<{ id: string; name: string; url: string | null }>
   onOpenPoi: (id: string) => void
   onSeeList: () => void
 }) {
   const isDesktop = useMedia('(min-width: 720px)')
-  const tiles = trip.placeIds.map((id) => {
-    const p = photos[id]
-    const url = p && typeof p === 'object' && p.hero ? (p.hero as string) : null
-    return { id, url }
-  })
   const withPhotos = tiles.filter((t) => !!t.url)
   const placeCount = trip.placeIds.length
   const [active, setActive] = useState(0)
@@ -494,10 +502,14 @@ function TripCard({
           {trip.name.charAt(0).toUpperCase()}
         </button>
       ) : isDesktop ? (
-        /* Desktop mosaic — up to 4 tiles as a 2×2 grid; the 4th shows a
-           "+N more" overlay if the trip has more than four saves. */
+        /* Desktop mosaic — up to 4 tiles as a 2×2 grid. Photo-having tiles
+           are promoted so the mosaic reads as photos, not blanks. The 4th
+           tile carries a "+N more" overlay when the trip has more saves. */
         (() => {
-          const shown = tiles.slice(0, 4)
+          // promote photo tiles first, then fill with blanks so the visible
+          // face of the card leads with pictures instead of chip placeholders
+          const ordered = [...withPhotos, ...tiles.filter((t) => !t.url)]
+          const shown = ordered.slice(0, 4)
           const cols = shown.length <= 1 ? '1fr' : '1fr 1fr'
           const rows = shown.length <= 2 ? '1fr' : '1fr 1fr'
           const remainder = tiles.length - shown.length
@@ -528,7 +540,7 @@ function TripCard({
                       else onOpenPoi(t.id)
                     }}
                     aria-label={
-                      isLast ? `See all ${tiles.length} places` : 'Open this place on the radar'
+                      isLast ? `See all ${tiles.length} places` : `Open ${t.name} on the radar`
                     }
                     style={{
                       position: 'relative',
@@ -541,6 +553,26 @@ function TripCard({
                       overflow: 'hidden',
                     }}
                   >
+                    {/* soft monogram for tiles without a photo — reads as an
+                        intentional editorial mark rather than a broken tile */}
+                    {!t.url && !isLast && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontFamily: 'var(--serif)',
+                          fontSize: 40,
+                          color: 'var(--text-ghost)',
+                          background:
+                            'radial-gradient(closest-side, var(--chip), var(--surface-raised))',
+                        }}
+                      >
+                        {(t.name || '·').charAt(0).toUpperCase()}
+                      </span>
+                    )}
                     {isLast && (
                       <span
                         style={{
@@ -549,10 +581,10 @@ function TripCard({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: 'rgba(0,0,0,0.5)',
-                          color: '#fff',
+                          background: t.url ? 'rgba(0,0,0,0.55)' : 'var(--chip)',
+                          color: t.url ? '#fff' : 'var(--text-primary)',
                           fontFamily: 'var(--serif)',
-                          fontSize: 26,
+                          fontSize: 24,
                           letterSpacing: 0.5,
                         }}
                       >
@@ -587,8 +619,9 @@ function TripCard({
                 e.stopPropagation()
                 onOpenPoi(t.id)
               }}
-              aria-label="Open this place on the radar"
+              aria-label={`Open ${t.name} on the radar`}
               style={{
+                position: 'relative',
                 flex: '0 0 100%',
                 scrollSnapAlign: 'start',
                 background: t.url ? `url(${t.url}) center/cover` : 'var(--chip)',
@@ -597,7 +630,26 @@ function TripCard({
                 padding: 0,
                 cursor: 'pointer',
               }}
-            />
+            >
+              {!t.url && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: 'var(--serif)',
+                    fontSize: 60,
+                    color: 'var(--text-ghost)',
+                    background:
+                      'radial-gradient(closest-side, var(--chip), var(--surface-raised))',
+                  }}
+                >
+                  {(t.name || '·').charAt(0).toUpperCase()}
+                </span>
+              )}
+            </button>
           ))}
         </div>
       )}
