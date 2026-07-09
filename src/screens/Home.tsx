@@ -51,6 +51,7 @@ export function Home() {
     openPlan: openPlanSheet,
     createTrip,
     setActiveTrip,
+    selectOnRadar,
     totalSavedCount,
   } = useStore()
   const [invitation] = useState(nextInvitation)
@@ -224,12 +225,17 @@ export function Home() {
                   key={trip.id}
                   trip={trip}
                   photos={photos}
-                  onExplore={() => {
-                    // Airbnb-style: tap a trip card and you're on the map.
+                  onOpenPoi={(id) => {
+                    // Decoupled from the whole-trip view: recenter the radar
+                    // on THIS specific POI and highlight it, so the user lands
+                    // concentrated on the destination they tapped, with the
+                    // surrounding places within 30 km around it.
+                    const poi = poiById(id) ?? persisted.savedOsm[id]
+                    if (!poi) return
                     haptic.medium()
                     setActiveTrip(trip.id)
-                    const c = tripCentroidLatLng(trip, persisted.savedOsm)
-                    if (c) location.choosePlace(`Trip · ${trip.name}`, c)
+                    location.choosePlace(poi.name, { lat: poi.lat, lng: poi.lng })
+                    selectOnRadar(id)
                     go('explore')
                   }}
                   onSeeList={() => {
@@ -396,30 +402,37 @@ export function Home() {
   )
 }
 
-/** A single trip card with a 2×2 photo mosaic from its first four places.
- * Primary tap = jump to the radar centered on this trip. Secondary tap on
- * the "N places" line = open the detail sheet with the list of saves. */
+/** A single trip card. Each mosaic tile is an independent target that opens
+ * THAT specific place on the radar — decoupled from any "open the whole
+ * trip" affordance. Trip name is a big label on top; the "N places" pill
+ * opens the trip list sheet. Empty trips show a monogram tile that opens
+ * the list so the user can start adding. */
 function TripCard({
   trip,
   photos,
-  onExplore,
+  onOpenPoi,
   onSeeList,
 }: {
   trip: Trip
   photos: Record<string, any>
-  onExplore: () => void
+  onOpenPoi: (id: string) => void
   onSeeList: () => void
 }) {
   const first4 = trip.placeIds.slice(0, 4)
-  // resolve up to 4 photo urls for the mosaic; fall back to fewer / none
-  const urls = first4
-    .map((id) => {
-      const p = photos[id]
-      return p && typeof p === 'object' && p.hero ? p.hero : null
-    })
-    .filter((u): u is string => !!u)
+  const tiles = first4.map((id) => {
+    const p = photos[id]
+    const url = p && typeof p === 'object' && p.hero ? (p.hero as string) : null
+    return { id, url }
+  })
+  const withPhotos = tiles.filter((t) => !!t.url)
   const placeCount = trip.placeIds.length
-  const missingPlaces = first4.length - urls.length
+  const missingPlaces = tiles.length - withPhotos.length
+
+  // Grid template chosen by how many tiles we actually have. Each tile is
+  // its own button so a photo tap opens THAT POI, not the whole trip.
+  const cols = tiles.length <= 1 ? '1fr' : '1fr 1fr'
+  const rows = tiles.length <= 2 ? '1fr' : '1fr 1fr'
+
   return (
     <div
       className="place-card"
@@ -437,14 +450,16 @@ function TripCard({
           position: 'absolute',
           inset: 0,
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gridTemplateRows: '1fr 1fr',
+          gridTemplateColumns: cols,
+          gridTemplateRows: rows,
           gap: 1,
           background: 'var(--hairline)',
         }}
       >
-        {urls.length === 0 && (
-          <div
+        {tiles.length === 0 && (
+          <button
+            onClick={onSeeList}
+            aria-label={`Open ${trip.name} — no places yet`}
             style={{
               gridColumn: '1 / -1',
               gridRow: '1 / -1',
@@ -453,57 +468,65 @@ function TripCard({
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text-ghost)',
-              fontSize: 32,
+              fontSize: 40,
               fontFamily: 'var(--serif)',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             {trip.name.charAt(0).toUpperCase()}
-          </div>
+          </button>
         )}
-        {urls.length === 1 && (
-          <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', background: `url(${urls[0]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-        )}
-        {urls.length === 2 && (
-          <>
-            <div style={{ gridRow: '1 / -1', background: `url(${urls[0]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-            <div style={{ gridRow: '1 / -1', background: `url(${urls[1]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-          </>
-        )}
-        {urls.length === 3 && (
-          <>
-            <div style={{ gridRow: '1 / -1', background: `url(${urls[0]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-            <div style={{ background: `url(${urls[1]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-            <div style={{ background: `url(${urls[2]}) center/cover`, backgroundColor: 'var(--chip)' }} />
-          </>
-        )}
-        {urls.length >= 4 && urls.slice(0, 4).map((u, i) => (
-          <div key={i} style={{ background: `url(${u}) center/cover`, backgroundColor: 'var(--chip)' }} />
-        ))}
+        {tiles.map((t, i) => {
+          // when we have exactly 3 tiles the first spans both rows for a
+          // classic mosaic — otherwise auto-flow across the 2×2 grid
+          const span3 = tiles.length === 3 && i === 0 ? '1 / -1' : undefined
+          return (
+            <button
+              key={t.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenPoi(t.id)
+              }}
+              aria-label={`Open this place on the radar`}
+              style={{
+                gridRow: span3,
+                background: t.url ? `url(${t.url}) center/cover` : 'var(--chip)',
+                backgroundColor: 'var(--chip)',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            />
+          )
+        })}
       </div>
 
-      {/* text overlay */}
+      {/* text overlay — pointer-events off so tile taps go through; the
+          trip name and "N places" pill re-enable pointer events on themselves */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
           background:
-            urls.length > 0
+            withPhotos.length > 0
               ? 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.55) 100%)'
               : 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.30) 100%)',
           padding: '14px 16px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
-          color: urls.length > 0 ? '#fff' : 'var(--text-primary)',
+          color: withPhotos.length > 0 ? '#fff' : 'var(--text-primary)',
+          pointerEvents: 'none',
         }}
       >
         <div
           className="serif"
           style={{
-            fontSize: 20,
+            fontSize: 22,
             lineHeight: 1.15,
-            marginBottom: 4,
-            textShadow: urls.length > 0 ? '0 2px 8px rgba(0,0,0,0.6)' : 'none',
+            marginBottom: 6,
+            textShadow: withPhotos.length > 0 ? '0 2px 10px rgba(0,0,0,0.7)' : 'none',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -511,41 +534,27 @@ function TripCard({
         >
           {trip.name}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
           <button
             onClick={onSeeList}
             className="mono"
             style={{
-              color: urls.length > 0 ? 'rgba(255,255,255,0.9)' : 'var(--text-secondary)',
+              pointerEvents: 'auto',
+              color: withPhotos.length > 0 ? 'rgba(255,255,255,0.95)' : 'var(--text-secondary)',
               fontSize: 10,
-              padding: '4px 8px',
+              padding: '4px 10px',
               borderRadius: 100,
-              background: urls.length > 0 ? 'rgba(0,0,0,0.28)' : 'var(--chip)',
-              backdropFilter: urls.length > 0 ? 'blur(6px)' : undefined,
+              background: withPhotos.length > 0 ? 'rgba(0,0,0,0.32)' : 'var(--chip)',
+              backdropFilter: withPhotos.length > 0 ? 'blur(6px)' : undefined,
               textTransform: 'none',
               letterSpacing: 0.6,
             }}
           >
-            {placeCount} place{placeCount === 1 ? '' : 's'}
+            {placeCount} place{placeCount === 1 ? '' : 's'} · see list
             {missingPlaces > 0 && placeCount > 0 ? ' · loading' : ''}
           </button>
         </div>
       </div>
-      {/* full-card overlay button = primary tap → radar */}
-      <button
-        onClick={onExplore}
-        aria-label={`Explore ${trip.name} on the radar`}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          // sits below the "N places" button in stacking order so that
-          // pill wins the tap when the user aims at it
-          zIndex: 1,
-        }}
-      />
     </div>
   )
 }

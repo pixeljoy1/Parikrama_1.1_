@@ -30,7 +30,7 @@ import { Pill } from '../components/Pill'
 type ScanState = 'idle' | 'scanning' | 'done' | 'error'
 
 export function Explore() {
-  const { persisted, location, go, openSettings, openPlan, openLocation, placeId, openPlace, rememberLocation, totalSavedCount } = useStore()
+  const { persisted, location, go, openSettings, openPlan, openLocation, placeId, sheetPlaceId, openPlace, closeSheet, rememberLocation, totalSavedCount } = useStore()
   const [ring, setRing] = useState<Ring>(10)
   const [invitation] = useState(nextInvitation)
   const [makersOpen, setMakersOpen] = useState(false)
@@ -140,14 +140,22 @@ export function Explore() {
     [within30, ring, persisted.pace],
   )
   const horizon = useMemo(() => (origin ? horizonHubs(origin, 30, 4) : []), [origin?.lat, origin?.lng])
-  const selected = useMemo(() => {
-    if (!placeId || !origin) return null
-    const hit = within30.find((s) => s.poi.id === placeId) ?? scoredAll.find((s) => s.poi.id === placeId)
+  const scoreOne = (id: string | null) => {
+    if (!id || !origin) return null
+    const hit = within30.find((s) => s.poi.id === id) ?? scoredAll.find((s) => s.poi.id === id)
     if (hit) return hit
     // a saved OSM discovery from a previous location — score its snapshot
-    const snap = persisted.savedOsm[placeId]
+    const snap = persisted.savedOsm[id]
     return snap ? (scorePois([snap], origin, profile, 1e9)[0] ?? null) : null
-  }, [within30, scoredAll, placeId, origin?.lat, origin?.lng, persisted.savedOsm])
+  }
+  const selected = useMemo(
+    () => scoreOne(placeId),
+    [within30, scoredAll, placeId, origin?.lat, origin?.lng, persisted.savedOsm],
+  )
+  const sheetSelected = useMemo(
+    () => scoreOne(sheetPlaceId),
+    [within30, scoredAll, sheetPlaceId, origin?.lat, origin?.lng, persisted.savedOsm],
+  )
 
   const osmCount = useMemo(() => within30.filter((s) => s.poi.osm).length, [within30])
 
@@ -561,7 +569,7 @@ export function Explore() {
           `transform`ed for the drag effect, which creates a new containing
           block for position: absolute children. That would drop the place
           sheet way down the scrolled content instead of over the viewport. */}
-      <PlaceSheet scored={selected} onClose={() => openPlace(null)} />
+      <PlaceSheet scored={sheetSelected} onClose={closeSheet} />
       <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
     </>
   )

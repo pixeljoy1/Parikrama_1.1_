@@ -58,9 +58,19 @@ interface StoreShape {
   openPlan: (v: boolean) => void
   locationOpen: boolean
   openLocation: (v: boolean) => void
-  /** currently inspected place id (detail sheet) */
+  /** the place highlighted on the radar (drives SelectedPlacePreview + dot glow) */
   placeId: string | null
+  /** the place whose full bottom-sheet is open (may be null while a radar
+   * selection is present — the two are decoupled) */
+  sheetPlaceId: string | null
+  /** open a place: highlights on the radar AND opens the detail sheet */
   openPlace: (id: string | null) => void
+  /** highlight on the radar only (no sheet). Used when navigating in from Home
+   * so the user lands on the radar concentrated on that POI, not buried under
+   * a bottom sheet. */
+  selectOnRadar: (id: string | null) => void
+  /** close the detail sheet, keeping the radar selection intact */
+  closeSheet: () => void
   /** the place currently open in the "save to trip" picker */
   savingPlace: Poi | null
   openSavePicker: (poi: Poi | null) => void
@@ -102,7 +112,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [settingsOpen, openSettings] = useState(false)
   const [planOpen, openPlan] = useState(false)
   const [locationOpen, openLocation] = useState(false)
-  const [placeId, openPlace] = useState<string | null>(null)
+  const [placeId, setPlaceId] = useState<string | null>(null)
+  const [sheetPlaceId, setSheetPlaceId] = useState<string | null>(null)
   const [savingPlace, openSavePicker] = useState<Poi | null>(null)
   const [viewingTripId, openTrip] = useState<string | null>(null)
   const [toast, setToast] = useState<StoreShape['toast']>(null)
@@ -140,7 +151,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       locationOpen,
       openLocation,
       placeId,
-      openPlace,
+      sheetPlaceId,
+      openPlace: (id) => {
+        setPlaceId(id)
+        setSheetPlaceId(id)
+      },
+      selectOnRadar: (id) => setPlaceId(id),
+      closeSheet: () => setSheetPlaceId(null),
       savingPlace,
       openSavePicker,
       viewingTripId,
@@ -204,7 +221,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleSeen: (id) => setPersisted((s) => ({ ...s, seen: toggleIn(s.seen, id) })),
       rememberLocation: (name, lat, lng) => patch({ lastLocation: { name, lat, lng } }),
     }),
-    [persisted, location, screen, settingsOpen, planOpen, locationOpen, placeId, savingPlace, viewingTripId, toast, totalSavedCount, patch],
+    [persisted, location, screen, settingsOpen, planOpen, locationOpen, placeId, sheetPlaceId, savingPlace, viewingTripId, toast, totalSavedCount, patch],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
