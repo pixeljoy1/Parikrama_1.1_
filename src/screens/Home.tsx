@@ -404,12 +404,28 @@ export function Home() {
   )
 }
 
-/** A single trip card. Instead of a fixed 2×2 mosaic, the card now hosts a
- * horizontal swipe carousel of every saved place in the trip — one photo
- * per slide, snap-aligned. Airbnb-style dots at the top show progress, the
- * trip name sits big at the bottom, and the "N places · see list" pill
- * opens the trip list sheet. Tapping any slide opens THAT specific POI on
- * the radar — decoupled from the whole-trip view. */
+/** Matches a CSS media query and re-renders when it flips. Used so trip cards
+ * can render a static mosaic on desktop (where swipe is unnatural with a
+ * mouse) and a swipe carousel on mobile — no CSS acrobatics, one honest
+ * layout per platform. */
+function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
+  useEffect(() => {
+    const m = window.matchMedia(query)
+    const on = () => setMatches(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [query])
+  return matches
+}
+
+/** A single trip card. On mobile: horizontal swipe carousel with dots. On
+ * desktop: a 2×2 photo mosaic with a "+N more" overlay on the 4th tile
+ * when there are more than four saves — because swiping with a mouse is a
+ * chore. Both layouts share the "tap a tile → open THAT POI on the radar"
+ * decoupling from the whole-trip view. */
 function TripCard({
   trip,
   photos,
@@ -421,6 +437,7 @@ function TripCard({
   onOpenPoi: (id: string) => void
   onSeeList: () => void
 }) {
+  const isDesktop = useMedia('(min-width: 720px)')
   const tiles = trip.placeIds.map((id) => {
     const p = photos[id]
     const url = p && typeof p === 'object' && p.hero ? (p.hero as string) : null
@@ -476,6 +493,78 @@ function TripCard({
         >
           {trip.name.charAt(0).toUpperCase()}
         </button>
+      ) : isDesktop ? (
+        /* Desktop mosaic — up to 4 tiles as a 2×2 grid; the 4th shows a
+           "+N more" overlay if the trip has more than four saves. */
+        (() => {
+          const shown = tiles.slice(0, 4)
+          const cols = shown.length <= 1 ? '1fr' : '1fr 1fr'
+          const rows = shown.length <= 2 ? '1fr' : '1fr 1fr'
+          const remainder = tiles.length - shown.length
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                gridTemplateColumns: cols,
+                gridTemplateRows: rows,
+                gap: 1,
+                background: 'var(--hairline)',
+              }}
+            >
+              {shown.map((t, i) => {
+                const isLast = i === shown.length - 1 && remainder > 0
+                // 3-tile mosaic: first tile spans both rows
+                const gridRow = shown.length === 3 && i === 0 ? '1 / -1' : undefined
+                return (
+                  <button
+                    key={t.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // clicking the "+N more" overlay opens the trip list;
+                      // any other tile opens THAT specific POI on the radar
+                      if (isLast) onSeeList()
+                      else onOpenPoi(t.id)
+                    }}
+                    aria-label={
+                      isLast ? `See all ${tiles.length} places` : 'Open this place on the radar'
+                    }
+                    style={{
+                      position: 'relative',
+                      gridRow,
+                      background: t.url ? `url(${t.url}) center/cover` : 'var(--chip)',
+                      backgroundColor: 'var(--chip)',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {isLast && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(0,0,0,0.5)',
+                          color: '#fff',
+                          fontFamily: 'var(--serif)',
+                          fontSize: 26,
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        +{remainder} more
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })()
       ) : (
         <div
           ref={scrollerRef}
@@ -513,8 +602,8 @@ function TripCard({
         </div>
       )}
 
-      {/* progress dots — only when there's more than one slide */}
-      {tiles.length > 1 && (
+      {/* progress dots — carousel only (mosaic layout speaks for itself) */}
+      {!isDesktop && tiles.length > 1 && (
         <div
           style={{
             position: 'absolute',
@@ -602,7 +691,7 @@ function TripCard({
           }}
         >
           {placeCount} place{placeCount === 1 ? '' : 's'} · see list
-          {tiles.length > 1 ? `  ·  ${active + 1} / ${tiles.length}` : ''}
+          {!isDesktop && tiles.length > 1 ? `  ·  ${active + 1} / ${tiles.length}` : ''}
         </button>
       </div>
     </div>
