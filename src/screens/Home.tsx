@@ -11,7 +11,7 @@
  *   4. A Wizard-signed footer, consistent with the SoundTherapy footer.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import wizardLogo from '../assets/wizard-logo.png'
 import { MakersPage } from '../components/MakersPage'
 import { VersionPill } from '../components/VersionPill'
@@ -77,12 +77,14 @@ export function Home() {
     }
   }, [trips, persisted.savedOsm])
 
-  // preload the first-4 photos across all trips so the mosaics feel instant
+  // preload photos for every place in every trip so the swipe carousel on
+  // each card feels instant. usePhotos dedupes + caches, so trips that share
+  // a place only pay for it once.
   const previewQueries: PhotoQuery[] = useMemo(() => {
     const seen = new Set<string>()
     const q: PhotoQuery[] = []
     for (const t of trips) {
-      for (const id of t.placeIds.slice(0, 4)) {
+      for (const id of t.placeIds) {
         if (seen.has(id)) continue
         seen.add(id)
         const poi = poiById(id) ?? persisted.savedOsm[id]
@@ -402,11 +404,12 @@ export function Home() {
   )
 }
 
-/** A single trip card. Each mosaic tile is an independent target that opens
- * THAT specific place on the radar — decoupled from any "open the whole
- * trip" affordance. Trip name is a big label on top; the "N places" pill
- * opens the trip list sheet. Empty trips show a monogram tile that opens
- * the list so the user can start adding. */
+/** A single trip card. Instead of a fixed 2×2 mosaic, the card now hosts a
+ * horizontal swipe carousel of every saved place in the trip — one photo
+ * per slide, snap-aligned. Airbnb-style dots at the top show progress, the
+ * trip name sits big at the bottom, and the "N places · see list" pill
+ * opens the trip list sheet. Tapping any slide opens THAT specific POI on
+ * the radar — decoupled from the whole-trip view. */
 function TripCard({
   trip,
   photos,
@@ -418,20 +421,28 @@ function TripCard({
   onOpenPoi: (id: string) => void
   onSeeList: () => void
 }) {
-  const first4 = trip.placeIds.slice(0, 4)
-  const tiles = first4.map((id) => {
+  const tiles = trip.placeIds.map((id) => {
     const p = photos[id]
     const url = p && typeof p === 'object' && p.hero ? (p.hero as string) : null
     return { id, url }
   })
   const withPhotos = tiles.filter((t) => !!t.url)
   const placeCount = trip.placeIds.length
-  const missingPlaces = tiles.length - withPhotos.length
+  const [active, setActive] = useState(0)
+  const scrollerRef = useRef<HTMLDivElement>(null)
 
-  // Grid template chosen by how many tiles we actually have. Each tile is
-  // its own button so a photo tap opens THAT POI, not the whole trip.
-  const cols = tiles.length <= 1 ? '1fr' : '1fr 1fr'
-  const rows = tiles.length <= 2 ? '1fr' : '1fr 1fr'
+  const onScroll = () => {
+    const el = scrollerRef.current
+    if (!el) return
+    const idx = Math.round(el.scrollLeft / Math.max(el.clientWidth, 1))
+    if (idx !== active) setActive(idx)
+  }
+
+  const jumpTo = (i: number) => {
+    const el = scrollerRef.current
+    if (!el) return
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+  }
 
   return (
     <div
@@ -445,52 +456,52 @@ function TripCard({
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'grid',
-          gridTemplateColumns: cols,
-          gridTemplateRows: rows,
-          gap: 1,
-          background: 'var(--hairline)',
-        }}
-      >
-        {tiles.length === 0 && (
-          <button
-            onClick={onSeeList}
-            aria-label={`Open ${trip.name} — no places yet`}
-            style={{
-              gridColumn: '1 / -1',
-              gridRow: '1 / -1',
-              background: 'var(--chip)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-ghost)',
-              fontSize: 40,
-              fontFamily: 'var(--serif)',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {trip.name.charAt(0).toUpperCase()}
-          </button>
-        )}
-        {tiles.map((t, i) => {
-          // when we have exactly 3 tiles the first spans both rows for a
-          // classic mosaic — otherwise auto-flow across the 2×2 grid
-          const span3 = tiles.length === 3 && i === 0 ? '1 / -1' : undefined
-          return (
+      {tiles.length === 0 ? (
+        <button
+          onClick={onSeeList}
+          aria-label={`Open ${trip.name} — no places yet`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'var(--chip)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-ghost)',
+            fontSize: 44,
+            fontFamily: 'var(--serif)',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          {trip.name.charAt(0).toUpperCase()}
+        </button>
+      ) : (
+        <div
+          ref={scrollerRef}
+          onScroll={onScroll}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollSnapType: 'x mandatory',
+            // touch swipe hint — matches Airbnb's card carousel
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          {tiles.map((t) => (
             <button
               key={t.id}
               onClick={(e) => {
                 e.stopPropagation()
                 onOpenPoi(t.id)
               }}
-              aria-label={`Open this place on the radar`}
+              aria-label="Open this place on the radar"
               style={{
-                gridRow: span3,
+                flex: '0 0 100%',
+                scrollSnapAlign: 'start',
                 background: t.url ? `url(${t.url}) center/cover` : 'var(--chip)',
                 backgroundColor: 'var(--chip)',
                 border: 'none',
@@ -498,24 +509,62 @@ function TripCard({
                 cursor: 'pointer',
               }}
             />
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* text overlay — pointer-events off so tile taps go through; the
-          trip name and "N places" pill re-enable pointer events on themselves */}
+      {/* progress dots — only when there's more than one slide */}
+      {tiles.length > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 10,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            gap: 5,
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          {tiles.map((_, i) => (
+            <button
+              key={i}
+              onClick={(e) => {
+                e.stopPropagation()
+                jumpTo(i)
+              }}
+              aria-label={`Go to place ${i + 1}`}
+              style={{
+                pointerEvents: 'auto',
+                width: i === active ? 14 : 5,
+                height: 5,
+                borderRadius: 100,
+                background: i === active ? '#fff' : 'rgba(255,255,255,0.55)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
+                border: 'none',
+                padding: 0,
+                transition: 'width 200ms ease',
+                cursor: 'pointer',
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* bottom gradient + name + list pill — pointer-events off so mid-card
+          swipes go to the scroller; the pill re-enables its own hits */}
       <div
         style={{
           position: 'absolute',
-          inset: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: '40px 16px 14px',
           background:
             withPhotos.length > 0
-              ? 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.55) 100%)'
-              : 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.30) 100%)',
-          padding: '14px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end',
+              ? 'linear-gradient(180deg, transparent, rgba(0,0,0,0.60))'
+              : 'linear-gradient(180deg, transparent, rgba(0,0,0,0.30))',
           color: withPhotos.length > 0 ? '#fff' : 'var(--text-primary)',
           pointerEvents: 'none',
         }}
@@ -534,26 +583,27 @@ function TripCard({
         >
           {trip.name}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-          <button
-            onClick={onSeeList}
-            className="mono"
-            style={{
-              pointerEvents: 'auto',
-              color: withPhotos.length > 0 ? 'rgba(255,255,255,0.95)' : 'var(--text-secondary)',
-              fontSize: 10,
-              padding: '4px 10px',
-              borderRadius: 100,
-              background: withPhotos.length > 0 ? 'rgba(0,0,0,0.32)' : 'var(--chip)',
-              backdropFilter: withPhotos.length > 0 ? 'blur(6px)' : undefined,
-              textTransform: 'none',
-              letterSpacing: 0.6,
-            }}
-          >
-            {placeCount} place{placeCount === 1 ? '' : 's'} · see list
-            {missingPlaces > 0 && placeCount > 0 ? ' · loading' : ''}
-          </button>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onSeeList()
+          }}
+          className="mono"
+          style={{
+            pointerEvents: 'auto',
+            color: withPhotos.length > 0 ? 'rgba(255,255,255,0.95)' : 'var(--text-secondary)',
+            fontSize: 10,
+            padding: '4px 10px',
+            borderRadius: 100,
+            background: withPhotos.length > 0 ? 'rgba(0,0,0,0.32)' : 'var(--chip)',
+            backdropFilter: withPhotos.length > 0 ? 'blur(6px)' : undefined,
+            textTransform: 'none',
+            letterSpacing: 0.6,
+          }}
+        >
+          {placeCount} place{placeCount === 1 ? '' : 's'} · see list
+          {tiles.length > 1 ? `  ·  ${active + 1} / ${tiles.length}` : ''}
+        </button>
       </div>
     </div>
   )
