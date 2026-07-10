@@ -374,6 +374,8 @@ function TripDetail({
           context: hub ? `${hub.name} ${hub.state}` : undefined,
           wikipedia: p.wikipedia,
           wikidata: p.wikidata,
+          lat: p.lat,
+          lng: p.lng,
         }
       }),
     [items],

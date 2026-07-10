@@ -178,6 +178,8 @@ export function Explore() {
         context: hub ? `${hub.name} ${hub.state}` : undefined,
         wikipedia: s.poi.wikipedia,
         wikidata: s.poi.wikidata,
+        lat: s.poi.lat,
+        lng: s.poi.lng,
       }
     })
   }, [within30, scoredAll, placeId])

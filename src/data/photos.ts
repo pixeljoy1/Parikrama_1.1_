@@ -28,10 +28,17 @@ export interface PhotoQuery {
   wikipedia?: string
   /** OSM wikidata tag: "Q12345" */
   wikidata?: string
+  /** POI coordinates — used as a last-resort fallback: geosearch nearby
+   * Wikipedia articles and grab the first one with a photo. Gives OSM
+   * finds without wiki tags a contextually-relevant image. */
+  lat?: number
+  lng?: number
 }
 
 const CACHE_TTL = 7 * 24 * 3600 * 1000
-const cacheKey = (id: string) => `parikrama.photo.v1.${id}`
+// v2: added nearbyPhoto geosearch fallback — bump to invalidate stale
+// empty-photo caches so previously-blank POIs pick up the fallback.
+const cacheKey = (id: string) => `parikrama.photo.v2.${id}`
 const inflight = new Map<string, Promise<PhotoSet>>()
 
 const EMPTY: PhotoSet = { hero: null, gallery: [] }
@@ -83,8 +90,21 @@ async function doFetch(q: PhotoQuery): Promise<PhotoSet> {
     if (!title) title = await searchTitle(q.name)
   }
 
-  if (!title) return EMPTY
-  return await fetchPageImages(title)
+  if (title) {
+    const first = await fetchPageImages(title)
+    if (first.hero) return first
+  }
+
+  // Last-resort geosearch: an OSM waterfall or fort might have no wiki
+  // article of its own, but the district / nearby monument does. Grab a
+  // photo from the closest article that has one so the trip collage
+  // never shows a blank tile.
+  if (q.lat != null && q.lng != null) {
+    const near = await nearbyPhoto(q.lat, q.lng)
+    if (near.hero) return near
+  }
+
+  return EMPTY
 }
 
 async function titleFromWikidata(qid: string): Promise<string | undefined> {
@@ -108,6 +128,45 @@ async function searchTitle(query: string): Promise<string | undefined> {
     return data?.[1]?.[0]
   } catch {
     return undefined
+  }
+}
+
+async function nearbyPhoto(lat: number, lng: number): Promise<PhotoSet> {
+  // geosearch 10 km around the point, then pull hero thumbnails for the
+  // top few results in one query. First non-empty wins.
+  const gsUrl =
+    `https://en.wikipedia.org/w/api.php?action=query&list=geosearch` +
+    `&gscoord=${lat}%7C${lng}&gsradius=10000&gslimit=6&format=json&origin=*`
+  try {
+    const res = await fetch(gsUrl, { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return EMPTY
+    const data = await res.json()
+    const titles: string[] = (data?.query?.geosearch ?? [])
+      .map((r: { title: string }) => r.title)
+      .filter(Boolean)
+    if (titles.length === 0) return EMPTY
+
+    const piUrl =
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${titles.map(encodeURIComponent).join('%7C')}` +
+      `&prop=pageimages&piprop=thumbnail&pithumbsize=800&format=json&origin=*`
+    const piRes = await fetch(piUrl, { signal: AbortSignal.timeout(8000) })
+    if (!piRes.ok) return EMPTY
+    const piData = await piRes.json()
+    const pages: Array<{ title: string; thumbnail?: { source: string } }> = Object.values(
+      piData?.query?.pages ?? {},
+    )
+    // preserve geosearch's distance ordering
+    const byTitle = new Map(pages.map((p) => [p.title, p.thumbnail?.source]))
+    for (const t of titles) {
+      const hero = byTitle.get(t)
+      if (hero) {
+        const source = `https://en.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, '_'))}`
+        return { hero, gallery: [hero], source }
+      }
+    }
+    return EMPTY
+  } catch {
+    return EMPTY
   }
 }
 

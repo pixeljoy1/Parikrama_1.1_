@@ -52,6 +52,8 @@ export function PlaceSheet({ scored, onClose }: Props) {
           context: hub ? `${hub.name} ${hub.state}` : undefined,
           wikipedia: s.poi.wikipedia,
           wikidata: s.poi.wikidata,
+          lat: s.poi.lat,
+          lng: s.poi.lng,
         }
       : null,
   )

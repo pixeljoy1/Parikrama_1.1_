@@ -96,6 +96,8 @@ export function Home() {
           context: hub ? `${hub.name} ${hub.state}` : undefined,
           wikipedia: poi.wikipedia,
           wikidata: poi.wikidata,
+          lat: poi.lat,
+          lng: poi.lng,
         })
       }
     }
