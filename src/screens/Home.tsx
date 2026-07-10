@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import wizardLogo from '../assets/wizard-logo.png'
+import { LegalSection, LegalSheet } from '../components/LegalSheet'
 import { MakersPage } from '../components/MakersPage'
 import { VersionPill } from '../components/VersionPill'
 import { Pill } from '../components/Pill'
@@ -56,6 +57,7 @@ export function Home() {
   } = useStore()
   const [invitation] = useState(nextInvitation)
   const [makersOpen, setMakersOpen] = useState(false)
+  const [legal, setLegal] = useState<LegalSection | null>(null)
   const [creatingTrip, setCreatingTrip] = useState(false)
   const [newTripName, setNewTripName] = useState('')
 
@@ -411,10 +413,52 @@ export function Home() {
               CRAFTED IN KOLKATA →
             </span>
           </button>
+
+          {/* legal footer links — open the swipe-down sheet */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              marginTop: 22,
+            }}
+          >
+            {(
+              [
+                ['terms', 'Terms'],
+                ['privacy', 'Privacy'],
+                ['disclaimers', 'Disclaimers'],
+              ] as const
+            ).map(([k, label], i) => (
+              <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {i > 0 && (
+                  <span className="mono" style={{ color: 'var(--text-ghost)' }}>
+                    ·
+                  </span>
+                )}
+                <button
+                  onClick={() => setLegal(k)}
+                  className="mono"
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                    letterSpacing: 0.6,
+                    background: 'transparent',
+                    padding: '4px 6px',
+                  }}
+                >
+                  {label}
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
       <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
+      <LegalSheet open={legal !== null} section={legal ?? 'terms'} onClose={() => setLegal(null)} />
     </div>
   )
 }

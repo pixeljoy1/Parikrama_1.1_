@@ -9,6 +9,7 @@ import wizardLogo from '../assets/wizard-logo.png'
 import { MakersPage } from '../components/MakersPage'
 import { PlaceCard } from '../components/PlaceCard'
 import { PlaceSheet } from '../components/PlaceSheet'
+import { LegalSection, LegalSheet } from '../components/LegalSheet'
 import { PullToRefresh } from '../components/PullToRefresh'
 import { VersionPill } from '../components/VersionPill'
 import { Radar } from '../components/Radar'
@@ -34,6 +35,7 @@ export function Explore() {
   const [ring, setRing] = useState<Ring>(10)
   const [invitation] = useState(nextInvitation)
   const [makersOpen, setMakersOpen] = useState(false)
+  const [legal, setLegal] = useState<LegalSection | null>(null)
   const reduce = useMemo(prefersReducedMotion, [])
 
   const origin = location.point
@@ -563,6 +565,47 @@ export function Explore() {
               CRAFTED IN KOLKATA →
             </span>
           </button>
+
+          {/* legal footer links — open the swipe-down sheet */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              marginTop: 22,
+            }}
+          >
+            {(
+              [
+                ['terms', 'Terms'],
+                ['privacy', 'Privacy'],
+                ['disclaimers', 'Disclaimers'],
+              ] as const
+            ).map(([k, label], i) => (
+              <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {i > 0 && (
+                  <span className="mono" style={{ color: 'var(--text-ghost)' }}>
+                    ·
+                  </span>
+                )}
+                <button
+                  onClick={() => setLegal(k)}
+                  className="mono"
+                  style={{
+                    fontSize: 10,
+                    color: 'var(--text-secondary)',
+                    letterSpacing: 0.6,
+                    background: 'transparent',
+                    padding: '4px 6px',
+                  }}
+                >
+                  {label}
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -573,6 +616,7 @@ export function Explore() {
           sheet way down the scrolled content instead of over the viewport. */}
       <PlaceSheet scored={sheetSelected} onClose={closeSheet} />
       <MakersPage open={makersOpen} onClose={() => setMakersOpen(false)} />
+      <LegalSheet open={legal !== null} section={legal ?? 'terms'} onClose={() => setLegal(null)} />
     </>
   )
 }
